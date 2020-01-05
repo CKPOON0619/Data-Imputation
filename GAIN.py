@@ -75,3 +75,26 @@ def compositLayers(layer_sizes,dropout_rate=drop_rate):
     layers+=[tf.keras.layers.Dense(layer_sizes[-2], activation=tf.nn.relu, kernel_initializer='glorot_normal')]
     layers=layers+[tf.keras.layers.Dense(layer_sizes[-1], activation=tf.nn.sigmoid, kernel_initializer='glorot_normal')]
     return tf.keras.Sequential(layers)
+
+#%% Adversial Opponents
+
+#Generator
+class myGenerator(Model):
+    def __init__(self,body=compositLayers([Dim*12,Dim*6,Dim*3,Dim*2,Dim*3,Dim*6,Dim*12,Dim],0.2)):
+        super(myGenerator, self).__init__()
+        self.body = body
+
+    def call(self,x,mask):
+        masked_x=mask*x
+        mask_sample=(1-mask)*tf.random.uniform(tf.shape(x),minval=0,maxval=1,dtype=tf.float32)
+        return self.body(tf.concat(axis = 1, values = [masked_x,mask_sample,mask]))+masked_x
+
+#Discriminator
+class myDiscriminator(Model):
+    def __init__(self,body=compositLayers([Dim*12,Dim*6,Dim*3,Dim*2,Dim*3,Dim*6,Dim*12,Dim],0.2)):
+        super(myDiscriminator, self).__init__()
+        self.body = body
+
+    def call(self,x_hat,hints):
+        return self.body(tf.concat(axis = 1, values = [x_hat,hints]))
+
