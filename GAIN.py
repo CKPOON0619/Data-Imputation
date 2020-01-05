@@ -5,9 +5,6 @@ import numpy as np
 from tensorflow.keras import Model
 from datetime import datetime
 
-#%% Tensorboard logging
-current_time = datetime.now().strftime("%Y%m%d-%H%M%S")
-logdir = './tf_logs' + current_time + "/"
 
 #%% System Parameters 
 
@@ -97,4 +94,19 @@ class myDiscriminator(Model):
 
     def call(self,x_hat,hints):
         return self.body(tf.concat(axis = 1, values = [x_hat,hints]))
+
+#%% GAN Model
+class MyModel(Model):
+    def __init__(self,logdir= './tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S") + "/",generator=myGenerator(),discriminator=myDiscriminator(),optimizer=tf.keras.optimizers.Adam()):
+        super(MyModel, self).__init__()
+        self.generator = generator
+        self.discriminator=discriminator
+        self.optimizer=optimizer
+
+        #Internal parameters
+        self.iter=0
+        self.epoch=tf.Variable(0,dtype=tf.int64)
+        os.makedirs(logdir, exist_ok=True)
+        self.summary_writer = tf.summary.create_file_writer(logdir)
+        print('tensorboard --logdir {}'.format(logdir))
 
