@@ -93,17 +93,20 @@ class myDiscriminator(Model):
         return self.body(tf.concat(axis = 1, values = [x_hat,hints]))
 
 #%% GAN Model
-class MyModel(Model):
-    def __init__(self,logdir= './tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S") + "/",generator=myGenerator(),discriminator=myDiscriminator(),optimizer=tf.keras.optimizers.Adam()):
-        super(MyModel, self).__init__()
-        self.generator = generator
-        self.discriminator=discriminator
-        self.optimizer=optimizer
 
-        #Internal parameters
+class MultiGAIN(Model):
+    def __init__(self, generators=[], discriminators=[], logdir= './tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams=defaultParams, optimizer=tf.keras.optimizers.Adam()):
+        super(MultiGAIN, self).__init__()
         self.iter=0
-        self.epoch=tf.Variable(0,dtype=tf.int64)
+        self.__dict__.update(hyperParams)
+        self.generators=generators
+        self.discriminators=discriminators
+        self.optimizer = optimizer
+        self.reset(logdir)
+
+    def reset(self,logdir):
+        self.epoch = tf.Variable(0,dtype=tf.int64)
         os.makedirs(logdir, exist_ok=True)
         self.summary_writer = tf.summary.create_file_writer(logdir)
-        print('tensorboard --logdir {}'.format(logdir))
+        print('tensorboard --logdir: {}'.format(logdir))
 
