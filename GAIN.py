@@ -10,19 +10,16 @@ from datetime import datetime
 
 # Training Data 
 file='measureGenerator'
+defaultParams={
+    'p_miss': 0.5, 
+    'p_hint': 0.5, 
+    'alpha': 1, 
+    'train_rate': 0.8, 
+    'iteration': 4000, 
+    'drop_rate': 0, 
+    'batch_size':0.2
+    }
 
-# 1. Missing rate
-p_miss = 0.5
-# 3. Hint rate
-p_hint = 0.5
-# 4. Loss Hyperparameters
-alpha = 1
-# 5. Train Rate
-train_rate = 0.8
-# 6. iteration
-iteration=4000
-# 7. Dropout Rate
-drop_rate=0
 
 #%% Data
 
