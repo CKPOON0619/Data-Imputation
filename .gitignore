@@ -1,3 +1,4 @@
 # Ignore all data files
 data
 __pycache__
+logs
