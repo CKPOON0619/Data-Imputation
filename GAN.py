@@ -34,16 +34,9 @@ def discriminate(discriminator,x_hat,hints):
     discriminated_probs=discriminator(x_hat,hints)
     return discriminated_probs
     
-    # Create trival case for discrimintor(random generated fillings)
-    # self.x_hat_trival=self.mask*self.x+tf.random.uniform(tf.shape(self.x),minval=0,maxval=1)*(1-self.mask)
-    # self.discriminated_trival_probs=self.discriminator(self.x_hat_trival,self.hints)
-        # Loss functions:
-
 def getDiscriminatorLoss(discriminated_probs,mask,missingRate):
     ## log Likelinhood comparison to ground truth + sample rebalancing
     discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1-missingRate)/missingRate*(1-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
-    # self.discriminator_trival_loss=-tf.reduce_mean(self.mask * tf.math.log(self.discriminated_trival_probs + 1e-8) + (1-p_miss)/p_miss*(1-self.mask) * tf.math.log(1. - self.discriminated_trival_probs + 1e-8))
-    # self.discriminator_loss=self.discriminator_generated_loss+self.discriminator_trival_loss
     return discriminator_loss
 
     ## Generator loss:
