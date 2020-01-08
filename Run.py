@@ -4,11 +4,12 @@ import tensorflow as tf
 from components.Generator import myGenerator
 from components.Discriminator import myDiscriminator
 from DataModel import DataModel
+from os import getcwd
 from GAN import GAN
 
 #%% Data Model
 file='measureGenerator'
-data_path="./data/{}.csv".format(file)
+data_path="{}\\data\\{}.csv".format(getcwd(),file)
 Data=DataModel(data_path)
 data_pipeline=Data.getPipeLine(train_rate=0.8,batch_num=10,repeat=20)
 #%% Models
