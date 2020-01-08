@@ -16,12 +16,11 @@ def createMask(data,maskRatio):
     '''
     return tf.dtypes.cast((tf.random.uniform(tf.shape(data),minval=0,maxval=1)>(1-maskRatio)),dtype=tf.float32)
 
-def createInputs(X,missRate,hintRate):
+def createMasknHint(X,missRate,hintRate):
     mask=createMask(X,1-missRate)
     hintMask=createMask(X,hintRate)
     hints=hintMask*mask+(1-hintMask)*0.5
-    masked_X=mask*X
-    return mask,masked_X,hints,hintMask
+    return mask,hintMask,hints
 
 def generate(generator,x,mask):
     # Create generated x
@@ -40,14 +39,26 @@ def getDiscriminatorLoss(discriminated_probs,mask,missingRate):
     return discriminator_loss
 
     ## Generator loss:
-def getGeneratorLoss(alpha,discriminated_probs,X,generated_X,mask):
+def getGeneratorFakeLoss(mask,discriminated_probs):
     ## Likelinhood loss caused by discriminable values
-    generator_fakeLoss = -tf.reduce_mean((1-mask) * tf.math.log(discriminated_probs + 1e-8))
+    return -tf.reduce_mean((1-mask) * tf.math.log(discriminated_probs + 1e-8))
+def getGeneratorTruthLoss(mask,X,generated_X):
     ## Regulating term for alteration of known truth
-    generator_truthLoss= tf.reduce_mean((mask*X - mask * generated_X)**2) / tf.reduce_mean(mask)
-    ## Total generator loss
-    generator_loss=generator_fakeLoss+alpha*generator_truthLoss
-    return generator_loss
+    return tf.reduce_mean((mask*X - mask * generated_X)**2) / tf.reduce_mean(mask)
+
+def getHiddenTruthDiscrimination(mask,hintMask,discriminated_probs):
+    ## Check if discriminator correctly predicted real data 
+    return tf.gather_nd(discriminated_probs,tf.where(mask*(1-hintMask)))
+def getHiddenFakeDiscrimination(mask,hintMask,discriminated_probs):
+    ## Check if discriminator correctly predicted generated(fake) data 
+    return tf.gather_nd(discriminated_probs,tf.where((1-mask)*(1-hintMask)))
+def getHiddenFakeGeneratedError(mask,hintMask,X,generated_X):
+    ## Check the difference between generated value and actual value
+    return tf.gather_nd((generated_X-X),tf.where((1-mask)*(1-hintMask)))
+
+def getGeneratorLoss(alpha,discriminated_probs,X,generated_X,mask):
+    return getGeneratorFakeLoss(mask,discriminated_probs)+alpha*getGeneratorTruthLoss(mask,X,generated_X)
+
 
 #%% GAN Model
 
@@ -76,12 +87,29 @@ class GAN(Model):
         print('tensorboard --logdir {}'.format(logdir))
 
     def calcLoss(self,X,generator,discriminator):
-        [mask,masked_X,hints,hintMask]=createInputs(X,self.p_miss,self.p_hint)
+        [mask,_,hints]=createMasknHint(X,self.p_miss,self.p_hint)
         [generated_X,X_hat]=generate(generator,X,mask)
         discriminated_probs=discriminate(discriminator,X_hat,hints)
         generator_loss=getGeneratorLoss(self.alpha,discriminated_probs,X,generated_X,mask)
         discriminator_loss=getDiscriminatorLoss(discriminated_probs,mask,self.p_miss)
         return generator_loss,discriminator_loss
+    
+    @tf.function
+    def performanceLog(self,prefix,X,generator,discriminator):
+        [mask,hintMask,hints]=createMasknHint(X,self.p_miss,self.p_hint)
+        [generated_X,X_hat]=generate(generator,X,mask)
+        discriminated_probs=discriminate(discriminator,X_hat,hints)
+
+        G_fakeLoss=getGeneratorFakeLoss(mask,discriminated_probs)
+        G_truthLoss=getGeneratorTruthLoss(mask,X,generated_X)
+        with self.summary_writer.as_default():
+            tf.summary.scalar(prefix+': generator_fakeLoss', G_fakeLoss, step=self.epoch)
+            tf.summary.scalar(prefix+': generator_truthLoss', G_truthLoss, step=self.epoch)
+            tf.summary.scalar(prefix+': discriminator_loss', getDiscriminatorLoss(discriminated_probs,mask,self.p_miss), step=self.epoch) 
+            tf.summary.histogram(prefix+': hidden truth discrimination',getHiddenTruthDiscrimination(mask,hintMask,discriminated_probs), step=self.epoch) 
+            tf.summary.histogram(prefix+': hidden fake discrimination',getHiddenFakeDiscrimination(mask,hintMask,discriminated_probs), step=self.epoch) 
+            tf.summary.histogram(prefix+': hidden fake generation error',getHiddenFakeGeneratedError(mask,hintMask,X,generated_X), step=self.epoch) 
+            self.summary_writer.flush()
 
     @tf.function
     def trainWithBatch(self,dataBatch,generator,discriminator):
@@ -92,5 +120,6 @@ class GAN(Model):
         D_loss_gradients = tape.gradient(D_loss,discriminator.trainable_variables)
         self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
         self.optimizer.apply_gradients(zip(D_loss_gradients, discriminator.trainable_variables))
+        self.epoch.assign_add(1)
         return G_loss,D_loss
             
