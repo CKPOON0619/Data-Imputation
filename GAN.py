@@ -4,6 +4,7 @@ import tensorflow as tf
 import numpy as np
 from tensorflow.keras import Model
 from datetime import datetime
+from os import getcwd
 #%% Helpers
 
 # Create Mask
@@ -66,8 +67,9 @@ defaultParams={
     'drop_rate': 0, 
     'batch_size':0.2
     }
+    
 class GAN(Model):
-    def __init__(self, logdir= './logs/tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams=defaultParams, optimizer=tf.keras.optimizers.Adam()):
+    def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S") + ' --host localhost', hyperParams=defaultParams, optimizer=tf.keras.optimizers.Adam()):
         super(GAN, self).__init__()
         self.iter=0
         self.__dict__.update(hyperParams)
@@ -78,7 +80,7 @@ class GAN(Model):
         self.epoch = tf.Variable(0,dtype=tf.int64)
         os.makedirs(logdir, exist_ok=True)
         self.summary_writer = tf.summary.create_file_writer(logdir)
-        print('tensorboard --logdir: {}'.format(logdir))
+        print('tensorboard --logdir {}'.format(logdir))
 
     def calcLoss(self,X,generator,discriminator):
         [mask,masked_X,hints,hintMask]=createInputs(X,self.p_miss,self.p_hint)
