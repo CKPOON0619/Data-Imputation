@@ -5,28 +5,49 @@ import numpy as np
 # Normalization (0 to 1)
 def createNormaliser(dataMin,dataMax):
     '''
-    dataMin:tensor of data min
-    dataMax:tensor of data  max
-    return: range normalised tensor
+    Args:
+        dataMin:tensor of data min
+        dataMax:tensor of data  max
+    Returns: 
+        range normalised tensor
     '''
     return lambda rawDataTensor:(rawDataTensor-dataMin)/(dataMax-dataMin+1e-6)
 
 # Return real value
 def createDenormaliser(dataMin,dataMax):
     '''
-    dataMin:tensor of data min
-    dataMax:tensor of data  max
-    return: de-normalised tensor
+    Args:
+        dataMin:tensor of data min
+        dataMax:tensor of data  max
+    Returns: 
+        de-normalised tensor
     '''
     return lambda dataTensor:(dataTensor)*(dataMax-dataMin+1e-6)+dataMin
 
 #%% Data Model
 class DataModel():
+    """
+    A data model class built to handle data transformation and input for the GAIN model.
+    
+    Args:
+        data_path: A path to a comma delimited csv file with data header.
+    """
     def __init__(self,data_path):
         self.data_path=data_path
 
     # Setting up data pipeline
     def getPipeLine(self,train_rate,batch_ratio,repeat):
+        """
+        This function create and return a tensorflow data object with provided arguments.
+
+        Args:
+            train_rate: Ratio of the data to be used for training.
+            batch_ratio: Ratio of the data to be used in each batch.
+            repeat: Number of times the dataset got repeated in the dataset iterator.
+
+        Returns:
+            A tensorflow dataset object zipped with train and test data.
+        """
         self.rawData=tf.convert_to_tensor(np.genfromtxt(self.data_path, delimiter=",",skip_header=1),dtype=tf.float32)
         [self.sample_size,self.Dim]=tf.shape(self.rawData).numpy()
         self.train_size=int(self.sample_size*train_rate)
@@ -48,10 +69,34 @@ class DataModel():
         return tf.data.Dataset.zip((dataset_train, dataset_test))
 
     def predict(self,generator,data,mask):
+        """
+        The predict function that use the generator to create predicted missing values.
+
+        Args:
+            generator: A Generator class for the GAIN model.
+            data: A piece of data with the same dim as the input data.
+            mask: data mask, indicating missing values. genuine = 1, missing = 0.
+        
+        Returns:
+            Missing filled data.
+        """
         x=self.normaliser(data)
         return self.denormaliser(generator(x,mask)*(1-mask)+mask*x)
 
     def discriminate(self,discriminator,data,mask):
+        """
+        The discriminate function that use the discriminator to predict generated values.
+
+        Args:
+            discriminator: A Discriminator class for the GAIN model.
+            data: A piece of data with the same dim as the input data.
+            mask: data mask, indicating missing values. genuine = 1, missing = 0.
+        
+        Returns:
+            A probability matrix with entries indicating the predicted probability that 
+            the data is genuine but not generated.
+            genuine -> 1, generated -> 0.
+        """
         hints=mask+(1-mask)*0.5
         x_hat=self.normaliser(data)
         return discriminator(x_hat,hints) 
