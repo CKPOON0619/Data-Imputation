@@ -30,7 +30,7 @@ class DataModel():
         self.rawData=tf.convert_to_tensor(np.genfromtxt(self.data_path, delimiter=",",skip_header=1),dtype=tf.float32)
         [self.sample_size,self.Dim]=tf.shape(self.rawData).numpy()
         self.train_size=int(self.sample_size*train_rate)
-        self.batch_size=self.sample_size//batch_num
+        self.batch_size=self.train_size//batch_num
         currentMax=tf.math.reduce_max(self.rawData,axis=0)
         currentMin=tf.math.reduce_min(self.rawData,axis=0)
         
