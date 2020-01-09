@@ -4,6 +4,7 @@ import tensorflow as tf
 from components.Generator import myGenerator
 from components.Discriminator import myDiscriminator
 from DataModel import DataModel
+from tqdm import tqdm
 from os import getcwd
 from GAN import GAN
 
@@ -18,10 +19,7 @@ Discriminator=myDiscriminator(Data.Dim,0)
 Model=GAN()
 
 #%% Run
-epoch=0
-for dat_train,dat_test in data_pipeline:
-    epoch+=1
-    print(epoch)
+for dat_train,dat_test in tqdm(data_pipeline):
     Model.trainWithBatch(dat_train,Generator,Discriminator)
     Model.performanceLog('Test',dat_test,Generator,Discriminator)
 
