@@ -18,8 +18,11 @@ Discriminator=myDiscriminator(Data.Dim,0)
 Model=GAN()
 
 #%% Run
-
+epoch=0
 for dat_train,dat_test in data_pipeline:
+    epoch+=1
+    print(epoch)
     Model.trainWithBatch(dat_train,Generator,Discriminator)
+    Model.performanceLog('Test',dat_test,Generator,Discriminator)
 
 # %%

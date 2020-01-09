@@ -73,7 +73,7 @@ defaultParams={
     }
     
 class GAN(Model):
-    def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S") + ' --host localhost', hyperParams=defaultParams, optimizer=tf.keras.optimizers.Adam()):
+    def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams=defaultParams, optimizer=tf.keras.optimizers.Adam()):
         super(GAN, self).__init__()
         self.iter=0
         self.__dict__.update(hyperParams)
@@ -84,7 +84,7 @@ class GAN(Model):
         self.epoch = tf.Variable(0,dtype=tf.int64)
         os.makedirs(logdir, exist_ok=True)
         self.summary_writer = tf.summary.create_file_writer(logdir)
-        print('tensorboard --logdir {}'.format(logdir))
+        print('tensorboard --logdir {}'.format(logdir)+' --host localhost')
 
     def calcLoss(self,X,generator,discriminator):
         [mask,_,hints]=createMasknHint(X,self.p_miss,self.p_hint)
