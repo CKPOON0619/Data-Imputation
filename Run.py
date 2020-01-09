@@ -12,7 +12,7 @@ from GAN import GAN
 file='measureGenerator'
 data_path="{}\\data\\{}.csv".format(getcwd(),file)
 Data=DataModel(data_path)
-data_pipeline=Data.getPipeLine(train_rate=0.8,batch_num=10,repeat=20)
+data_pipeline=Data.getPipeLine(train_rate=0.8,batch_ratio=0.2,repeat=20)
 #%% Models
 Generator=myGenerator(Data.Dim,0)
 Discriminator=myDiscriminator(Data.Dim,0)

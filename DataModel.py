@@ -26,11 +26,11 @@ class DataModel():
         self.data_path=data_path
 
     # Setting up data pipeline
-    def getPipeLine(self,train_rate,batch_num,repeat):
+    def getPipeLine(self,train_rate,batch_ratio,repeat):
         self.rawData=tf.convert_to_tensor(np.genfromtxt(self.data_path, delimiter=",",skip_header=1),dtype=tf.float32)
         [self.sample_size,self.Dim]=tf.shape(self.rawData).numpy()
         self.train_size=int(self.sample_size*train_rate)
-        self.batch_size=self.train_size//batch_num
+        self.batch_size=int(self.sample_size*batch_ratio)
         currentMax=tf.math.reduce_max(self.rawData,axis=0)
         currentMin=tf.math.reduce_min(self.rawData,axis=0)
         
