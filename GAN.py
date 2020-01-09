@@ -171,17 +171,19 @@ defaultParams={
     'p_miss': 0.5, 
     'p_hint': 0.5, 
     'alpha': 1, 
-    'iteration': 4000, 
-    'drop_rate': 0, 
-    'batch_size':0.2
+    'G_train_step':10:
     }
     
 class GAN(Model):
     '''
     Generative Adversarial Net(GAN) structure for Generative Adversarial Information Net(GAIN).
-    logdir: 
-        logging directory for tensorboard. Default to be "./logs/tf_logs(dateTime)"
-        hyperParams: hyperparameters for the GAN model, default to be {'p_miss': 0.5, 'p_hint': 0.5, 'alpha': 1, 'iteration': 4000, 'drop_rate': 0, 'batch_size':0.2}
+    Args:
+        logdir: logging directory for tensorboard. Default to be "./logs/tf_logs(dateTime)"
+        hyperParams: hyperparameters for the GAN model, default to be {'p_miss': 0.5, 'p_hint': 0.5, 'alpha': 1}
+                    p_miss: missing rate of data
+                    p_hint: proportion of data entry to be given as known answer to the discriminator. 
+                    alpha: regulation parameters.
+                    G_train_step: Number of steps that discriminator is trained before we train generator again.
         optimizer: A tensorflow optimizer class object
     '''
     def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams=defaultParams, optimizer=tf.keras.optimizers.Adam()):
@@ -260,10 +262,13 @@ class GAN(Model):
         with tf.GradientTape(persistent=True) as tape:
             G_loss,D_loss=self.calcLoss(dataBatch,generator,discriminator)
         # Learning and update weights
-        G_loss_gradients = tape.gradient(G_loss,generator.trainable_variables)
+       
         D_loss_gradients = tape.gradient(D_loss,discriminator.trainable_variables)
-        self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
         self.optimizer.apply_gradients(zip(D_loss_gradients, discriminator.trainable_variables))
+        if(self.epoch%self.G_train_step==0):
+            G_loss_gradients = tape.gradient(G_loss,generator.trainable_variables)
+            self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
+        
         self.epoch.assign_add(1)
         return G_loss,D_loss
             
