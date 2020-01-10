@@ -1,5 +1,4 @@
 import tensorflow as tf
-from components.NetworkComponents import compositLayers
 from tensorflow.keras import Model
 
 # Discriminator
@@ -9,12 +8,11 @@ class myDiscriminator(Model):
 
     Args:
         Dim: Dimension of data point.
-        drop_rate: drop out rate of the dropout layer in the model.
+        body: A kera Model that return a matrix of the same shape as data input. 
     """
-    def __init__(self,Dim,drop_rate):
+    def __init__(self,body):
         super(myDiscriminator, self).__init__()
-        self.body = compositLayers([Dim*12,Dim*6,Dim*3,Dim*2,Dim*3,Dim*6,Dim*12,Dim],drop_rate)
-
+        self.body = body
     def call(self,x_hat,hints):
         """
         Discriminator model call for GAIN which is a residual block with a dense sequential body.
