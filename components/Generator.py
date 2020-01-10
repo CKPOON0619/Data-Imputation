@@ -1,7 +1,13 @@
 import tensorflow as tf
 from tensorflow.keras import Model
 
+
+
 #Generator
+
+def randomGeneration(input):
+    masked_x,masked_sample,mask=tf.split(input,num_or_size_splits=3, axis=1)
+    return tf.random.uniform(tf.shape(masked_x),minval=0,maxval=1,dtype=tf.float32)
 class myGenerator(Model):
     """
     A generator class for the GAIN model.
