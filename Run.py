@@ -13,7 +13,6 @@ from GAN import GAN
 file='measureGenerator'
 data_path="{}\\data\\{}.csv".format(getcwd(),file)
 Data=DataModel(data_path)
-data_pipeline=Data.getPipeLine(train_rate=0.8,batch_ratio=0.2,repeat=500)
 #%% Models
 Dim=Data.Dim
 randomGenerator=myGenerator()
@@ -27,17 +26,18 @@ Model2=GAN(logdir=Model1.logdir,hyperParams={'G_train_step':1})
 # First train the discriminator against a random generator to increase its stability
 
 counter=0
-for dat_train,dat_test in tqdm(data_pipeline):
+for dat_train,dat_test in tqdm(Data.getPipeLine(train_rate=0.8,batch_ratio=0.2,repeat=500)):
     Model1.trainWithBatch(dat_train,randomGenerator,Discriminator)
     # Model.trainWithBatch(dat_train,Generator,Discriminator)
-    if(counter%10==0):
-        Model1.performanceLog('<Random Generator>',dat_test,randomGenerator,Discriminator)
+    if(counter%20==0):
+        Model1.performanceLog('<Random Generator>(train)',dat_train,randomGenerator,Discriminator)
+        Model1.performanceLog('<Random Generator>(test)',dat_test,randomGenerator,Discriminator)
 #%%
 # Then train the discriminator against a learn-able generator model.
 counter=0
-for dat_train,dat_test in tqdm(data_pipeline):
+for dat_train,dat_test in tqdm(Data.getPipeLine(train_rate=0.8,batch_ratio=0.2,repeat=500)):
     Model2.trainWithBatch(dat_train,Generator,Discriminator)
-    if(counter%10==0):
-        Model2.performanceLog('<Generator>',dat_test,Generator,Discriminator)
+    if(counter%20==0):
+        Model2.performanceLog('<Generator>(train)',dat_train,Generator,Discriminator)
+        Model2.performanceLog('<Generator>(test)',dat_test,Generator,Discriminator)
 
-# %%
