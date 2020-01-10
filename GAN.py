@@ -212,6 +212,7 @@ class GAN(Model):
         Args: 
             logdir: logging directory for tensorboard
         '''
+        self.logdir=logdir
         self.epoch = tf.Variable(0,dtype=tf.int64)
         os.makedirs(logdir, exist_ok=True)
         self.summary_writer = tf.summary.create_file_writer(logdir)
