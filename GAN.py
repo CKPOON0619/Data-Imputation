@@ -186,12 +186,25 @@ class GAN(Model):
                     G_train_step: Number of steps that discriminator is trained before we train generator again.
         optimizer: A tensorflow optimizer class object
     '''
-    def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams=defaultParams, optimizer=tf.keras.optimizers.Adam()):
+    def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams={}, optimizer=tf.keras.optimizers.Adam()):
         super(GAN, self).__init__()
         self.iter=0
+        self.__dict__.update(defaultParams)
         self.__dict__.update(hyperParams)
         self.optimizer = optimizer
         self.reset(logdir)
+
+    def setHyperParams(self,hyperParams):
+        '''
+        A function to update model hyperParams.
+        Args: 
+            hyperParams: hyperparameters for the GAN model:
+                p_miss: missing rate of data
+                p_hint: proportion of data entry to be given as known answer to the discriminator. 
+                alpha: regulation parameters.
+                G_train_step: Number of steps that discriminator is trained before we train generator again.
+        '''
+        self.__dict__.update(hyperParams)
 
     def reset(self,logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S")):
         '''
