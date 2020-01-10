@@ -170,8 +170,8 @@ def getGeneratorLoss(alpha,discriminated_probs,X,generated_X,mask):
 defaultParams={
     'p_miss': 0.5, 
     'p_hint': 0.5, 
-    'alpha': 1, 
-    'G_train_step':10:
+    'alpha': 0, 
+    'G_train_step':1
     }
     
 class GAN(Model):
@@ -179,7 +179,7 @@ class GAN(Model):
     Generative Adversarial Net(GAN) structure for Generative Adversarial Information Net(GAIN).
     Args:
         logdir: logging directory for tensorboard. Default to be "./logs/tf_logs(dateTime)"
-        hyperParams: hyperparameters for the GAN model, default to be {'p_miss': 0.5, 'p_hint': 0.5, 'alpha': 1}
+        hyperParams: hyperparameters for the GAN model, default to be {'p_miss': 0.5, 'p_hint': 0.5, 'alpha': 1, 'G_train_step':10}
                     p_miss: missing rate of data
                     p_hint: proportion of data entry to be given as known answer to the discriminator. 
                     alpha: regulation parameters.
