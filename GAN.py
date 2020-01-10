@@ -256,12 +256,12 @@ class GAN(Model):
         G_fakeLoss=getGeneratorFakeLoss(mask,discriminated_probs)
         G_truthLoss=getGeneratorTruthLoss(mask,X,generated_X)
         with self.summary_writer.as_default():
-            tf.summary.scalar(prefix+': generator_fakeLoss', G_fakeLoss, step=self.epoch)
-            tf.summary.scalar(prefix+': generator_truthLoss', G_truthLoss, step=self.epoch)
-            tf.summary.scalar(prefix+': discriminator_loss', getDiscriminatorLoss(discriminated_probs,mask,self.p_miss), step=self.epoch) 
-            tf.summary.histogram(prefix+': hidden truth discrimination',getHiddenTruthDiscrimination(mask,hintMask,discriminated_probs), step=self.epoch) 
-            tf.summary.histogram(prefix+': hidden fake discrimination',getHiddenFakeDiscrimination(mask,hintMask,discriminated_probs), step=self.epoch) 
-            tf.summary.histogram(prefix+': hidden fake generation error',getHiddenFakeGeneratedError(mask,hintMask,X,generated_X), step=self.epoch) 
+            tf.summary.scalar(prefix+' generator_fakeLoss', G_fakeLoss, step=self.epoch)
+            tf.summary.scalar(prefix+' generator_truthLoss', G_truthLoss, step=self.epoch)
+            tf.summary.scalar(prefix+' discriminator_loss', getDiscriminatorLoss(discriminated_probs,mask,self.p_miss), step=self.epoch) 
+            tf.summary.histogram(prefix+' hidden truth discrimination',getHiddenTruthDiscrimination(mask,hintMask,discriminated_probs), step=self.epoch) 
+            tf.summary.histogram(prefix+' hidden fake discrimination',getHiddenFakeDiscrimination(mask,hintMask,discriminated_probs), step=self.epoch) 
+            tf.summary.histogram(prefix+' hidden fake generation error',getHiddenFakeGeneratedError(mask,hintMask,X,generated_X), step=self.epoch) 
             self.summary_writer.flush()
 
     @tf.function
