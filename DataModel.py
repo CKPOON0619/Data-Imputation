@@ -3,25 +3,25 @@ import numpy as np
 
 #%% Helpers
 # Normalization (0 to 1)
-def createNormaliser(dataMin,dataMax):
+def createNormaliser(dataRange):
     '''
     Args:
-        dataMin:tensor of data min
-        dataMax:tensor of data  max
+        dataRange:[min,max]
     Returns: 
         range normalised tensor
     '''
+    dataMin,dataMax=dataRange
     return lambda rawDataTensor:(rawDataTensor-dataMin)/(dataMax-dataMin+1e-6)
 
 # Return real value
-def createDenormaliser(dataMin,dataMax):
+def createDenormaliser(dataRange):
     '''
     Args:
-        dataMin:tensor of data min
-        dataMax:tensor of data  max
+        dataRange:[min,max]
     Returns: 
         de-normalised tensor
     '''
+    dataMin,dataMax=dataRange
     return lambda dataTensor:(dataTensor)*(dataMax-dataMin+1e-6)+dataMin
 
 #%% Data Model
@@ -32,8 +32,19 @@ class DataModel():
     Args:
         data_path: A path to a comma delimited csv file with data header.
     """
-    def __init__(self,data_path):
+    def __init__(self,data_path,rangeBoost=2):
         self.data_path=data_path
+        self.rawData=tf.convert_to_tensor(np.genfromtxt(self.data_path, delimiter=",",skip_header=1),dtype=tf.float32)
+        [self.sample_size,self.Dim]=tf.shape(self.rawData).numpy()
+        currentMax=tf.math.reduce_max(self.rawData,axis=0)
+        currentMin=tf.math.reduce_min(self.rawData,axis=0)
+        
+        # Increase data range TODO: review how this should work
+        dataMax=currentMax+rangeBoost*(currentMax-currentMin) # max + 2*(max-min)
+        dataMin=currentMin-rangeBoost*(currentMax-currentMin) # min - 2*(max-min)
+        self.range=[dataMin,dataMax]
+        self.normaliser=createNormaliser(self.range)
+        self.denormaliser=createDenormaliser(self.range)
 
     # Setting up data pipeline
     def getPipeLine(self,train_rate,batch_ratio,repeat):
@@ -48,20 +59,8 @@ class DataModel():
         Returns:
             A tensorflow dataset object zipped with train and test data.
         """
-        self.rawData=tf.convert_to_tensor(np.genfromtxt(self.data_path, delimiter=",",skip_header=1),dtype=tf.float32)
-        [self.sample_size,self.Dim]=tf.shape(self.rawData).numpy()
         self.train_size=int(self.sample_size*train_rate)
         self.batch_size=int(self.sample_size*batch_ratio)
-        currentMax=tf.math.reduce_max(self.rawData,axis=0)
-        currentMin=tf.math.reduce_min(self.rawData,axis=0)
-        
-        # Increase data range TODO: review how this should work
-        dataMax=3*currentMax-2*currentMin
-        dataMin=3*currentMin-2*currentMax
-        self.range=[dataMin,dataMax]
-        
-        self.normaliser=createNormaliser(dataMax,dataMin)
-        self.denormaliser=createDenormaliser(dataMax,dataMin)
         
         dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size)
         dataset_train=dataset.take(self.train_size).batch(self.batch_size,drop_remainder=True).repeat(repeat)
