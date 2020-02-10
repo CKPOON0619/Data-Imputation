@@ -1,4 +1,4 @@
-# Create generator/discriminator counterparts
+# Create generator/discriminator bodies
 import tensorflow as tf
 
 def compositLayers(layer_sizes,dropout_rate=0.2):
