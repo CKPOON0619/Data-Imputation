@@ -1,0 +1,7 @@
+name: TensorFlow_Env
+dependencies:
+  - numpy
+  - tensorflow==2.0.0
+  - tqdm
+
+  
