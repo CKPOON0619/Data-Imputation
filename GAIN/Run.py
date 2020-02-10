@@ -8,10 +8,11 @@ from DataModel import DataModel
 from tqdm import tqdm
 from os import getcwd
 from GAN import GAN
+from pathlib import Path
 
 #%% Data Model
 file='measureGenerator'
-data_path="{}\\data\\{}.csv".format(getcwd(),file)
+data_path="{}\\data\\{}.csv".format(Path(getcwd()).parent,file)
 Data=DataModel(data_path)
 #%% Models
 Dim=Data.Dim
@@ -35,9 +36,10 @@ for dat_train,dat_test in tqdm(Data.getPipeLine(train_rate=0.8,batch_ratio=0.2,r
 #%%
 # Then train the discriminator against a learn-able generator model.
 counter=0
-for dat_train,dat_test in tqdm(Data.getPipeLine(train_rate=0.8,batch_ratio=0.2,repeat=500)):
+for dat_train,dat_test in tqdm(Data.getPipeLine(train_rate=0.8,batch_ratio=0.2,repeat=10)):
     Model2.trainWithBatch(dat_train,Generator,Discriminator)
     if(counter%20==0):
         Model2.performanceLog('<Generator>(train)',dat_train,Generator,Discriminator)
         Model2.performanceLog('<Generator>(test)',dat_test,Generator,Discriminator)
 
+# %%
