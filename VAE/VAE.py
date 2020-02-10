@@ -63,7 +63,7 @@ class VAE(tf.keras.Model):
         logqz_x = log_normal_pdf(z, mean, logvar)
         return -tf.reduce_mean(logpx_z + logpz - logqz_x)
     
-    # @tf.function
+    @tf.function
     def trainWithBatch(self, x, encoder, decoder):
         with tf.GradientTape() as tape:
             loss = self.calcLoss(encoder, decoder, x)
