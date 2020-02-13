@@ -164,6 +164,14 @@ def getGeneratorLoss(alpha,discriminated_probs,X,generated_X,mask):
     return getGeneratorFakeLoss(mask,discriminated_probs)+alpha*getGeneratorTruthLoss(mask,X,generated_X)
 
 
+def getTestMask(x):
+    shape=tf.shape(x)
+    testMask=tf.tile(tf.concat([tf.ones([1,shape[1]-1],dtype=tf.float32),tf.zeros([1,1],dtype=tf.float32)],axis=1),[shape[0],1])
+    return testMask
+
+def getLastColumn(x):
+    return tf.gather(x,[tf.shape(x)[1]-1],axis=1)
+
 #%% GAN Model
 
 # Model params
@@ -188,12 +196,11 @@ class GAN(Model):
     '''
     def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams={}, optimizer=tf.keras.optimizers.Adam()):
         super(GAN, self).__init__()
-        self.iter=0
         self.__dict__.update(defaultParams)
         self.__dict__.update(hyperParams)
         self.optimizer = optimizer
         self.reset(logdir)
-
+        
     def setHyperParams(self,hyperParams):
         '''
         A function to update model hyperParams.
@@ -253,6 +260,8 @@ class GAN(Model):
         [generated_X,X_hat]=generate(generator,X,mask)
         discriminated_probs=discriminate(discriminator,X_hat,hints)
 
+        [generatedLastCol,_]=generate(generator,X,getTestMask(X))
+        
         G_fakeLoss=getGeneratorFakeLoss(mask,discriminated_probs)
         G_truthLoss=getGeneratorTruthLoss(mask,X,generated_X)
         with self.summary_writer.as_default():
@@ -262,6 +271,8 @@ class GAN(Model):
             tf.summary.histogram(prefix+' hidden truth discrimination',getHiddenTruthDiscrimination(mask,hintMask,discriminated_probs), step=self.epoch) 
             tf.summary.histogram(prefix+' hidden fake discrimination',getHiddenFakeDiscrimination(mask,hintMask,discriminated_probs), step=self.epoch) 
             tf.summary.histogram(prefix+' hidden fake generation error',getHiddenFakeGeneratedError(mask,hintMask,X,generated_X), step=self.epoch) 
+            tf.summary.histogram(prefix+' generated last column distribution',getLastColumn(generatedLastCol), step=self.epoch) 
+            tf.summary.histogram(prefix+' actual last column distribution',getLastColumn(X), step=self.epoch) 
             self.summary_writer.flush()
 
     @tf.function
