@@ -10,9 +10,10 @@ class myDiscriminator(Model):
         Dim: Dimension of data point.
         body: A kera Model that return a matrix of the same shape as data input. 
     """
-    def __init__(self,body):
+    def __init__(self,body=False):
         super(myDiscriminator, self).__init__()
-        self.body = body
+        if(body):
+            self.body = body
     def call(self,x_hat,hints):
         """
         Discriminator model call for GAIN which is a residual block with a dense sequential body.

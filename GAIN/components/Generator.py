@@ -3,8 +3,9 @@ from tensorflow.keras import Model
 
 #Generator
 def randomGeneration(input):
-    masked_x,masked_sample,mask=tf.split(input,num_or_size_splits=3, axis=1)
-    return tf.random.uniform(tf.shape(masked_x),minval=0,maxval=1,dtype=tf.float32)
+    # masked_x,masked_sample,mask=tf.split(input,num_or_size_splits=3, axis=1)
+    masked_sample_x,mask=tf.split(input,num_or_size_splits=2, axis=1)
+    return tf.random.uniform(tf.shape(masked_sample_x),minval=0,maxval=1,dtype=tf.float32)
 
 class myGenerator(Model):
     """
@@ -31,5 +32,6 @@ class myGenerator(Model):
         """
         masked_x=mask*x
         masked_sample=(1-mask)*tf.random.uniform(tf.shape(x),minval=0,maxval=1,dtype=tf.float32)
-        return self.body(tf.concat(axis = 1, values = [masked_x,masked_sample,mask]))*(1-mask)+masked_x
+        # return self.body(tf.concat(axis = 1, values = [masked_x,masked_sample,mask]))*(1-mask)+masked_x
+        return self.body(tf.concat(axis = 1, values = [masked_x+masked_sample,mask]))
 

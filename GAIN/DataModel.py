@@ -59,13 +59,16 @@ class DataModel():
         Returns:
             A tensorflow dataset object zipped with train and test data.
         """
-        self.train_size=int(self.sample_size*train_rate)
-        self.batch_size=int(self.sample_size*batch_ratio)
+        train_size=int(self.sample_size*train_rate)
+        test_size=self.sample_size-train_size
+        train_batch=int(train_size*batch_ratio)
+        test_batch=int(test_size*batch_ratio)
         
         dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size)
-        dataset_train=dataset.take(self.train_size).batch(self.batch_size,drop_remainder=True).repeat(repeat)
-        dataset_test=dataset.skip(self.train_size).batch(self.batch_size,drop_remainder=True).repeat(int(repeat*train_rate/(1-train_rate)))
-        return tf.data.Dataset.zip((dataset_train, dataset_test))
+        dataset_train=dataset.take(train_size).batch(train_batch,drop_remainder=True).repeat(repeat)
+        
+        dataset_test=dataset.skip(train_size).batch(test_batch,drop_remainder=True).repeat(int(repeat*train_rate/(1-train_rate)))
+        return dataset_train,dataset_test
 
     def predict(self,generator,data,mask):
         """
