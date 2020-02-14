@@ -31,9 +31,8 @@ def createMask(data,maskRatio):
 
 #%% Body
 class VAE(tf.keras.Model):
-    def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams={}, optimizer=tf.keras.optimizers.Adam()):
+    def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams={}, optimizer=tf.keras.optimizers.Adam(1e-4)):
         super(VAE, self).__init__()
-        self.iter=0
         # self.__dict__.update(defaultParams)
         self.__dict__.update(hyperParams)
         self.optimizer = optimizer
@@ -51,8 +50,17 @@ class VAE(tf.keras.Model):
         self.summary_writer = tf.summary.create_file_writer(logdir)
         print('tensorboard --logdir {}'.format(logdir)+' --host localhost')
 
+    def eval(self, encoder, decoder, x, mask, apply_sigmoid):
+        [mean, logvar] = encoder(x, mask)
+        z = reparameterize(mean, logvar)
+        x_logit = decoder(z)
+        if(apply_sigmoid):
+            return tf.sigmoid(x_logit)
+        return x_logit
+        
+    # @tf.function
     def calcLoss(self, encoder, decoder, x):
-        mask = createMask(x, 0.2)
+        mask = createMask(x, 0.1)
         [mean, logvar] = encoder(x, mask)
         z = reparameterize(mean, logvar)
         x_logit = decoder(z)
@@ -61,12 +69,25 @@ class VAE(tf.keras.Model):
         logpx_z = -tf.reduce_sum(cross_ent, axis=[1])
         logpz = log_normal_pdf(z, 0., 0.)
         logqz_x = log_normal_pdf(z, mean, logvar)
-        return -tf.reduce_mean(logpx_z + logpz - logqz_x)
+        
+        # print('mean:::',mean)
+        # print('logvar:::',logvar)
+        # print('cross_entLLL',cross_ent)
+        # print('logpx_z:::',logpx_z)
+        # print('loss:::',-tf.reduce_mean(logpx_z), -tf.reduce_mean(logpz - logqz_x))
+        return -tf.reduce_mean(100*logpx_z + (logpz - logqz_x))
+    
     
     @tf.function
     def trainWithBatch(self, x, encoder, decoder):
         with tf.GradientTape() as tape:
+            
             loss = self.calcLoss(encoder, decoder, x)
+            with self.summary_writer.as_default():
+                self.epoch.assign_add(1)
+                tf.summary.scalar('loss', loss, step=self.epoch)
+                self.summary_writer.flush()
+                
         gradients = tape.gradient(loss, encoder.trainable_variables+decoder.trainable_variables)
         self.optimizer.apply_gradients(zip(gradients, encoder.trainable_variables+decoder.trainable_variables))
 
