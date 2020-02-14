@@ -321,7 +321,7 @@ class GAN(Model):
         if(self.epoch%steps==0):
             G_loss_gradients = tape.gradient(G_loss,generator.trainable_variables)
             self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
-        
+        self.epoch.assign_add(1)
         return G_loss,D_loss
 
     @tf.function
