@@ -28,7 +28,7 @@ def createHint(mask,hintRate):
         hintMask: mask for creating hints with 1,0 values. Same size as X.
         hints: hints matrix with 1,0.5,0 values. Same size as X.
     '''
-    hintMask=createMask(mask,hintRate)
+    hintMask=createMask(mask,1-hintRate)
     hints=hintMask*mask+(1-hintMask)*0.5
     return hintMask,hints
 
@@ -262,7 +262,7 @@ class GAN(Model):
             discriminator_loss: loss result of the discriminator.
         '''
         if(customMask==False):
-            mask=createMask(X,self.p_miss)
+            mask=createMask(X,1-self.p_miss)
         else:
             mask=tf.tile(customMask,[1,tf.shape(X)[0]])
         [_,hints]=createHint(mask,self.p_hint)
@@ -299,7 +299,7 @@ class GAN(Model):
             customMask: a custom mask to be applied, if not provided, a random mask would be generated.
         '''
         if(customMask==False):
-            mask=createMask(X,self.p_miss)
+            mask=createMask(X,1-self.p_miss)
         else:
             mask=tf.tile(customMask,[1,tf.shape(X)[0]])
         [hintMask,hints]=createHint(mask,self.p_hint)
