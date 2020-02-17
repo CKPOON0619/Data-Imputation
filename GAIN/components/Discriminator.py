@@ -14,6 +14,13 @@ class myDiscriminator(Model):
         super(myDiscriminator, self).__init__()
         if(body):
             self.body = body
+    
+    def save(self,path):
+        self.body.save(path)
+    
+    def load(self,path):
+        self.body=tf.keras.models.load_model(path)
+        
     def call(self,x_hat,hints):
         """
         Discriminator model call for GAIN which is a residual block with a dense sequential body.

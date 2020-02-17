@@ -18,6 +18,12 @@ class myGenerator(Model):
         super(myGenerator,self).__init__()
         self.body = body
 
+    def save(self,path):
+        self.body.save(path)
+    
+    def load(self,path):
+        self.body=tf.keras.models.load_model(path)
+
     def call(self,x,mask):
         """
         Generator model call for GAIN which is a residual block with a dense sequential body.
