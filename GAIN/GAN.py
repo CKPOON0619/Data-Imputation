@@ -272,19 +272,32 @@ class GAN(Model):
         discriminator_loss=getDiscriminatorLoss(discriminated_probs,mask,self.p_miss)
         return generator_loss,discriminator_loss
     
-    def calcTotalEpisodesLoss(self,X,generator,customMask=False):
+    def calcTotalDiscriminatorLoss(self,X,generators,discriminator,customMask=False):
         if(customMask==False):
             mask=createMask(X,self.p_miss)
         else:
             mask=tf.tile(customMask,[1,tf.shape(X)[0]])
         [_,hints]=createHint(mask,self.p_hint)
-        [generated_X,X_hat]=generate(generator,X,mask)
         
-        episode_generator_losses=[]
-        for i in range(0,self.episode_num):
-            episode_generator_losses.append(getGeneratorLoss(self.alpha,discriminate(self.episodes[i],X_hat,hints),X,generated_X,mask))
-        return tf.math.add_n(episode_generator_losses)
-    
+        discriminator_losses=[]
+        for generator in generators:
+            [generated_X,X_hat]=generate(generator,X,mask)
+            discriminator_losses.append(getDiscriminatorLoss(discriminator(X_hat,hints),mask,self.p_miss))
+        return tf.math.add_n(discriminator_losses)
+   
+    def calcTotalGeneratorLoss(self,X,generator,discriminators,customMask=False):
+        if(customMask==False):
+            mask=createMask(X,self.p_miss)
+        else:
+            mask=tf.tile(customMask,[1,tf.shape(X)[0]],dtype=tf.float32)
+        [_,hints]=createHint(mask,self.p_hint)
+        [generated_X,X_hat]=generate(generator,X,mask)
+
+        generator_losses=[]
+        for discriminator in discriminators:
+            generator_losses.append(getGeneratorLoss(self.alpha,discriminate(discriminator,X_hat,hints),X,generated_X,mask))
+        return tf.math.add_n(generator_losses)
+   
     @tf.function
     def performanceLog(self,prefix,X,generator,discriminator,customMask=False):
         '''
@@ -367,6 +380,11 @@ class GAN(Model):
             episode=cloneModel(discriminator,myDiscriminator)
             cloneWeights(discriminator,episode)
             self.episodes.append(episode)
+            
+    @tf.function
+    def trainDiscriminators(self,data_batch,generator,discriminators):
+        for discriminator in discriminators:
+            self.trainDiscriminator(data_batch,generator,discriminator)
     
     @tf.function
     def unrollDiscriminator(self,data_batch,generator,discriminator):
@@ -376,16 +394,30 @@ class GAN(Model):
             self.trainDiscriminator(data_batch,generator,self.episodes[i])
             cloneWeights(self.episodes[i],self.episodes[i+1])
         self.trainDiscriminator(data_batch,generator,self.episodes[self.episode_num-1])
+
+    @tf.function
+    def trainDiscriminatorWithGenerators(self,dataBatch,generators,discriminator,customMask=False):
+        with tf.GradientTape(persistent=True) as tape:
+            total_D_loss=self.calcTotalDiscriminatorLoss(dataBatch,generators,discriminator,customMask)
+        # Learning and update weights
+        D_loss_gradients = tape.gradient(total_D_loss,discriminator.trainable_variables)
+        self.optimizer.apply_gradients(zip(D_loss_gradients, discriminator.trainable_variables))
+        self.epoch.assign_add(1)
+        return total_D_loss
     
     @tf.function
-    def trainGeneratorWithEpisodes(self,dataBatch,generator,discriminator,customMask=False):
+    def trainGeneratorWithDiscriminators(self,dataBatch,generator,discriminators,customMask=False):
         with tf.GradientTape(persistent=True) as tape:
-            total_G_episodes_loss=self.calcTotalEpisodesLoss(dataBatch,generator,customMask)
+            total_G_loss=self.calcTotalGeneratorLoss(dataBatch,generator,discriminators,customMask)
         # Learning and update weights
-        G_loss_gradients = tape.gradient(total_G_episodes_loss,generator.trainable_variables)
+        G_loss_gradients = tape.gradient(total_G_loss,generator.trainable_variables)
         self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
         self.epoch.assign_add(1)
-        return total_G_episodes_loss
+        return total_G_loss
+    
+    @tf.function
+    def trainGeneratorWithEpisodes(self,dataBatch,generator,customMask=False):
+        return self.trainGeneratorWithDiscriminators(dataBatch,generator,self.episodes,customMask)
         
     @tf.function    
     def trainGenerator(self,dataBatch,generator,discriminator,customMask=False):
