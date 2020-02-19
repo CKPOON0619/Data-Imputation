@@ -17,14 +17,14 @@ Data=DataModel(data_path)
 #%% Models
 Dim=Data.Dim
 randomGenerator=myGenerator()
-Generator=myGenerator(compositLayers([Dim*100,Dim*100,Dim*100,Dim*100,Dim*100,Dim*100,Dim*100,Dim*100,Dim*200,Dim],0.2))
-Discriminator=myDiscriminator(compositLayers([Dim*100,Dim*100,Dim*100,Dim*100,Dim*100,Dim*100,Dim*100,Dim],0.2))
+Generator=myGenerator(compositLayers([Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*200,Dim],0.2))
+Discriminator=myDiscriminator(compositLayers([Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim],0.2))
 # Due to existing limitation of tensorflow api, 
 # each GAN model could not be reused for another adversarial pair: 
 # https://github.com/tensorflow/tensorflow/issues/27120
 # Should use one single model once the issue is resolved.
 Model1=GAN(hyperParams={'p_miss':1/6, 'p_hint':1/6},optimizer=tf.keras.optimizers.Adam())
-Model2=GAN(logdir=Model1.logdir,hyperParams={'p_miss':1/6, 'p_miss':1/6},optimizer=tf.keras.optimizers.Adam())
+Model2=GAN(logdir=Model1.logdir,hyperParams={'p_miss':1/6, 'p_miss':1/6, 'alpha':0.1, 'episode_num':10 },optimizer=tf.keras.optimizers.Adam())
 #%% Run - Step 1
 # First train the discriminator against a random generator to increase its stability
 counter=0
@@ -36,22 +36,26 @@ for dat_train in tqdm(train):
         Model1.performanceLog('<Random Generator>(train)',dat_train,randomGenerator,Discriminator)
         Model1.performanceLog('<Random Generator>(test)',test.next(),randomGenerator,Discriminator)    
     if(counter%100==0):
-        Discriminator.save(Model1.path+'\DiscriminatorS1E{}'.format(Model1.epoch))
+        Discriminator.save(Model1.logdir+'\DiscriminatorS1E{}'.format(counter))
+    counter+=1
 #%% Run - Step 2 (unrolled)
 # Then train the generator and discriminator with discriminator unrolling. 
 counter=0
-train,test=Data.getPipeLine(train_rate=0.8,batch_ratio=1,repeat=3000)
+train,test=Data.getPipeLine(train_rate=0.8,batch_ratio=1,repeat=5000)
 test=iter(test)
 Model2.initialiseEpisodes(Discriminator,myDiscriminator)
 for dat_train in tqdm(train):
+    Model2.trainDiscriminator(dat_train,Generator,Discriminator)
+    Model2.trainDiscriminator(dat_train,Generator,Discriminator)
+    Model2.trainDiscriminator(dat_train,Generator,Discriminator)
     Model2.unrollDiscriminator(dat_train,Generator,Discriminator)
     Model2.trainGeneratorWithEpisodes(dat_train,Generator,Discriminator)
     if(counter%20==0):
         Model2.performanceLog('<Generator>(train)',dat_train,Generator,Discriminator)
         Model2.performanceLog('<Generator>(test)',test.next(),Generator,Discriminator)
-    if(counter%100==0):
-        Generator.save(Model2.path+'\GeneratorS2E{}'.format(Model2.epoch))
-        Discriminator.save(Model2.path+'\DiscriminatorS2E{}'.format(Model2.epoch))
+    counter+=1
+Generator.save(Model2.logdir+'\GeneratorS2E{}'.format(counter))
+Discriminator.save(Model2.logdir+'\DiscriminatorS2E{}'.format(counter))
 
 
 #%% Run - Step 2

@@ -274,7 +274,7 @@ class GAN(Model):
     
     def calcTotalEpisodesLoss(self,X,generator,customMask=False):
         if(customMask==False):
-            mask=createMask(X,self.p_miss)
+            mask=createMask(X,1-self.p_miss)
         else:
             mask=tf.tile(customMask,[1,tf.shape(X)[0]])
         [_,hints]=createHint(mask,self.p_hint)
