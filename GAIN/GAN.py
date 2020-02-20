@@ -218,12 +218,15 @@ class GAN(Model):
                     episode_num: the number of episode the discriminator would be unrolled.
         optimizer: A tensorflow optimizer class object
     '''
-    def __init__(self, logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S"), hyperParams={}, optimizer=tf.keras.optimizers.Adam()):
+    def __init__(self,summary_writer=False, hyperParams={}, optimizer=tf.keras.optimizers.Adam()):
         super(GAN, self).__init__()
         self.__dict__.update(defaultParams)
         self.__dict__.update(hyperParams)
         self.optimizer = optimizer
-        self.reset(logdir)
+        if(summary_writer):
+            self.summary_writer=summary_writer
+        else:
+            self.reset()
         
     def setHyperParams(self,hyperParams):
         '''
@@ -242,7 +245,7 @@ class GAN(Model):
         Args: 
             logdir: logging directory for tensorboard
         '''
-        self.logdir=logdir
+        self.logdir = logdir
         self.epoch = tf.Variable(0,dtype=tf.int64)
         os.makedirs(logdir, exist_ok=True)
         self.summary_writer = tf.summary.create_file_writer(logdir)
@@ -341,6 +344,7 @@ class GAN(Model):
         if(steps and self.epoch%steps==0):
             G_loss_gradients = tape.gradient(G_loss,generator.trainable_variables)
             self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
+        
         self.epoch.assign_add(1)
         return G_loss,D_loss
 
