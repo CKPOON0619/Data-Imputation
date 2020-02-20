@@ -369,11 +369,13 @@ class GAN(Model):
             self.episodes.append(episode)
     
     @tf.function
-    def unrollDiscriminator(self,data_batch,generator,discriminator):
-        self.trainDiscriminator(data_batch,generator,discriminator)
+    def unrollDiscriminator(self,data_batch,generator,discriminator,leap=5):
+        for i in range(0,leap):
+            self.trainDiscriminator(data_batch,generator,discriminator)
         cloneWeights(discriminator,self.episodes[0])
         for i in range(0,self.episode_num-1):
-            self.trainDiscriminator(data_batch,generator,self.episodes[i])
+            for i in range(0,leap):
+                self.trainDiscriminator(data_batch,generator,self.episodes[i])
             cloneWeights(self.episodes[i],self.episodes[i+1])
         self.trainDiscriminator(data_batch,generator,self.episodes[self.episode_num-1])
     
