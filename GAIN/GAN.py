@@ -223,10 +223,11 @@ class GAN(Model):
         self.__dict__.update(defaultParams)
         self.__dict__.update(hyperParams)
         self.optimizer = optimizer
+        self.epoch = tf.Variable(0,dtype=tf.int64)
         if(summary_writer):
             self.summary_writer=summary_writer
         else:
-            self.reset()
+            self.set_logDir()
         
     def setHyperParams(self,hyperParams):
         '''
@@ -239,14 +240,13 @@ class GAN(Model):
         '''
         self.__dict__.update(hyperParams)
 
-    def reset(self,logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S")):
+    def set_logDir(self,logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S")):
         '''
         A function to reset logging directory and training epoch.
         Args: 
             logdir: logging directory for tensorboard
         '''
         self.logdir = logdir
-        self.epoch = tf.Variable(0,dtype=tf.int64)
         os.makedirs(logdir, exist_ok=True)
         self.summary_writer = tf.summary.create_file_writer(logdir)
         print('tensorboard --logdir {}'.format(logdir)+' --host localhost')
