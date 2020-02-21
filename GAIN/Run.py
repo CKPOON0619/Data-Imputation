@@ -60,10 +60,10 @@ counter=0
 model_counter=0
 train,test=Data.getPipeLine(train_rate=0.8,batch_ratio=1,repeat=100)
 test=iter(test)
-Model3.initialiseEpisodes(Discriminator,myDiscriminator)
+episodes=Model3.initialiseEpisodes(Discriminator,myDiscriminator)
 for dat_train in tqdm(train):
     Model3.unrollDiscriminator(dat_train,Generator,Discriminator,leap=1)
-    Model3.trainGeneratorWithEpisodes(dat_train,Generator,Discriminator)
+    Model3.trainGeneratorWithDiscriminators(dat_train,Generator,episodes)
     if(counter%20==0):
         Model3.performanceLog('<Generator>(train)',dat_train,Generator,Discriminator)
         Model3.performanceLog('<Generator>(test)',test.next(),Generator,Discriminator)
