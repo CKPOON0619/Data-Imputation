@@ -17,8 +17,8 @@ Data=DataModel(data_path)
 #%% Models
 Dim=Data.Dim
 randomGenerator=myGenerator()
-Generator=myGenerator(compositLayers([Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*200,Dim],0))
-Discriminator=myDiscriminator(compositLayers([Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*10,Dim*200,Dim],0))
+Generator=myGenerator(compositLayers([Dim*10,Dim*10,Dim*10,Dim*10,Dim*20,Dim*20,Dim*20,Dim*50,Dim*200,Dim],0))
+Discriminator=myDiscriminator(compositLayers([Dim*10,Dim*10,Dim*10,Dim*20,Dim*20,Dim*20,Dim*50,Dim*200,Dim],0))
 # Due to existing limitation of tensorflow api, 
 # each GAN model could not be reused for another adversarial pair: 
 # https://github.com/tensorflow/tensorflow/issues/27120
@@ -29,7 +29,7 @@ Model3=GAN(summary_writer=Model1.summary_writer,hyperParams={'p_miss':0.5, 'p_mi
 #%% Run - Step 1
 # First train the discriminator against a random generator to increase its stability
 counter=0
-train,test=Data.getPipeLine(train_rate=0.8,batch_ratio=1,repeat=2000)
+train,test=Data.getPipeLine(train_rate=0.8,batch_ratio=1,repeat=50)
 test=iter(test)
 for dat_train in tqdm(train):
     Model1.trainWithSteps(dat_train,randomGenerator,Discriminator,steps=False)
@@ -43,7 +43,7 @@ Discriminator.save(Model1.logdir+'Models\DiscriminatorS1E{}'.format(1))
 # Then train the discriminator against a train-able generator model without unrolling
 counter=0
 model_counter=0
-train,test=Data.getPipeLine(train_rate=0.8,batch_ratio=1,repeat=5000)
+train,test=Data.getPipeLine(train_rate=0.8,batch_ratio=1,repeat=5)
 test=iter(test)
 for dat_train in tqdm(train):
     Model2.trainWithSteps(dat_train,Generator,Discriminator)
