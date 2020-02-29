@@ -209,7 +209,6 @@ def createEpisodes(discriminator,myDiscriminator,episode_num):
 # Model params
 defaultParams={
     'p_miss': 0.5, 
-    'p_hint': 0.5, 
     'alpha': 0, 
     'episode_num': 5
     }
@@ -219,9 +218,8 @@ class GAN(Model):
     Generative Adversarial Net(GAN) structure for Generative Adversarial Information Net(GAIN).
     Args:
         logdir: logging directory for tensorboard. Default to be "./logs/tf_logs(dateTime)"
-        hyperParams: hyperparameters for the GAN model, default to be {'p_miss': 0.5, 'p_hint': 0.5, 'alpha': 0, episode_num: 5}
-                    p_miss: missing rate of data
-                    p_hint: proportion of data entry to be given as known answer to the discriminator. 
+        hyperParams: hyperparameters for the GAN model, default to be {'p_miss': 0.5, 'alpha': 0, episode_num: 5}
+                    p_miss: missing rate of data for rebalancing during training for generator
                     alpha: regulation parameters.
                     episode_num: the number of episode the discriminator would be unrolled.
         optimizer: A tensorflow optimizer class object
@@ -259,59 +257,43 @@ class GAN(Model):
         self.summary_writer = tf.summary.create_file_writer(logdir)
         print('tensorboard --logdir {}'.format(logdir)+' --host localhost')
 
-    def calcLoss(self,X,generator,discriminator,customMask=False):
+    def calcLoss(self,X,mask,hints,generator,discriminator):
         '''
         Calculate the loss of the generator and discriminator.
 
         Args:
             X: Input data.
+            mask: mask of the data, 0,1 matrix of the same shape as X.
+            hints: hints matrix with 1,0.5,0 values. Same shape as X.
             generator: A generator model for the GAIN structure.
             discriminator: A discriminator model for the GAIN structure.
-            customMask: a custom mask to be applied, if not provided, a random mask would be generated.
         Returns:
             generator_loss: loss result of the generator.1
             discriminator_loss: loss result of the discriminator.
         '''
-        if(customMask==False):
-            mask=createMask(X,1-self.p_miss)
-        else:
-            mask=tf.tile(customMask,[1,tf.shape(X)[0]])
-        [_,hints]=createHint(mask,self.p_hint)
         [generated_X,X_hat]=generate(generator,X,mask)
         discriminated_probs=discriminate(discriminator,X_hat,hints)
         generator_loss=getGeneratorLoss(self.alpha,discriminated_probs,X,generated_X,mask)
         discriminator_loss=getDiscriminatorLoss(discriminated_probs,mask,self.p_miss)
         return generator_loss,discriminator_loss
     
-    def calcTotalEpisodesLoss(self,X,generator,customMask=False):
-        if(customMask==False):
-            mask=createMask(X,1-self.p_miss)
-        else:
-            mask=tf.tile(customMask,[1,tf.shape(X)[0]])
-        [_,hints]=createHint(mask,self.p_hint)
+    def calcTotalEpisodesLoss(self,X,mask,hints,generator):
         [generated_X,X_hat]=generate(generator,X,mask)
-        
         episode_generator_losses=[]
         for i in range(0,self.episode_num):
             episode_generator_losses.append(getGeneratorLoss(self.alpha,discriminate(self.episodes[i],X_hat,hints),X,generated_X,mask))
         return tf.math.add_n(episode_generator_losses)
     
         
-    def calcMultiGeneratorLoss(self,X,generator,discriminators,customMask=False):
-        if(customMask==False):
-            mask=createMask(X,1-self.p_miss)
-        else:
-            mask=tf.tile(customMask,[1,tf.shape(X)[0]])
-        [_,hints]=createHint(mask,self.p_hint)
+    def calcMultiGeneratorLoss(self,X,mask,hints,generator,discriminators):
         [generated_X,X_hat]=generate(generator,X,mask)
-        
         generator_losses=[]
         for i in range(0,len(discriminators)):
             generator_losses.append(getGeneratorLoss(self.alpha,discriminate(discriminators[i],X_hat,hints),X,generated_X,mask))
         return tf.math.add_n(generator_losses)
 
     @tf.function
-    def performanceLog(self,prefix,X,generator,discriminator,customMask=False):
+    def performanceLog(self,prefix,X,mask,hintMask,hints,generator,discriminator):
         '''
         A performance logger linked to tensorboard logs in the logdir. 
         Calculations are executed in graph mode.
@@ -321,13 +303,7 @@ class GAN(Model):
             X: Input data.
             generator: A generator model for the GAIN structure.
             discriminator: A discriminator model for the GAIN structure.
-            customMask: a custom mask to be applied, if not provided, a random mask would be generated.
         '''
-        if(customMask==False):
-            mask=createMask(X,1-self.p_miss)
-        else:
-            mask=tf.tile(customMask,[1,tf.shape(X)[0]])
-        [hintMask,hints]=createHint(mask,self.p_hint)
         [generated_X,X_hat]=generate(generator,X,mask)
         discriminated_probs=discriminate(discriminator,X_hat,hints)
 
@@ -347,17 +323,19 @@ class GAN(Model):
             self.summary_writer.flush()
 
     @tf.function
-    def trainWithSteps(self,dataBatch,generator,discriminator,steps=1,customMask=False):
+    def trainWithSteps(self,dataBatch,mask,hints,generator,discriminator,steps=1):
         '''
         A function that train generator and respective discriminator.
         Args:
             dataBatch: data input.
+            mask: mask of the data, 0,1 matrix of the same shape as data.
+            hints: hints matrix with 1,0.5,0 values. Same shape as data.
             generator: A generator model for the GAIN structure.
             discriminator: A discriminator model for the GAIN structure.
-            customMask: a custom mask to be applied, if not provided, a random mask would be generated.
+            steps: The number of steps training the discriminator each time before training the generator.
         '''
         with tf.GradientTape(persistent=True) as tape:
-            G_loss,D_loss=self.calcLoss(dataBatch,generator,discriminator,customMask)
+            G_loss,D_loss=self.calcLoss(dataBatch,mask,hints,generator,discriminator)
         # Learning and update weights
        
         D_loss_gradients = tape.gradient(D_loss,discriminator.trainable_variables)
@@ -370,60 +348,41 @@ class GAN(Model):
         self.epoch.assign_add(1)
         return G_loss,D_loss
 
-    def trainDiscriminator(self,dataBatch,generator,discriminator,customMask=False):
+    def trainDiscriminator(self,dataBatch,mask,hints,generator,discriminator):
         '''
         A function that train the discriminator against given generator.
         Args:
             dataBatch: data input.
             generator: A generator model for the GAIN structure.
             discriminator: A discriminator model for the GAIN structure.
-            customMask: a custom mask to be applied, if not provided, a random mask would be generated.
         '''
         with tf.GradientTape(persistent=True) as tape:
-            G_loss,D_loss=self.calcLoss(dataBatch,generator,discriminator,customMask)
+            G_loss,D_loss=self.calcLoss(dataBatch,mask,hints,generator,discriminator)
         # Learning and update weights
        
         D_loss_gradients = tape.gradient(D_loss,discriminator.trainable_variables)
         self.optimizer.apply_gradients(zip(D_loss_gradients, discriminator.trainable_variables))
         return G_loss,D_loss,tape
     
-    # def initialiseEpisodes(self,discriminator,myDiscriminator):
-    #     self.episodes=[]
-    #     for i in range(0,self.episode_num):
-    #         episode=cloneModel(discriminator,myDiscriminator)
-    #         cloneWeights(discriminator,episode)
-    #         self.episodes.append(episode)
-    #     return self.episodes
-    
     def initialiseEpisodes(self,discriminator,myDiscriminator):
         self.episodes=createEpisodes(discriminator,myDiscriminator,self.episode_num)
         return self.episodes
     
     @tf.function
-    def unrollDiscriminator(self,data_batch,generator,discriminator,leap=5):
+    def unrollDiscriminator(self,data_batch,mask,hints,generator,discriminator,leap=5):
         for i in range(0,leap):
-            self.trainDiscriminator(data_batch,generator,discriminator)
+            self.trainDiscriminator(data_batch,mask,hints,generator,discriminator)
         cloneWeights(discriminator,self.episodes[0])
         for i in range(0,self.episode_num-1):
             for i in range(0,leap):
-                self.trainDiscriminator(data_batch,generator,self.episodes[i])
+                self.trainDiscriminator(data_batch,mask,hints,generator,self.episodes[i])
             cloneWeights(self.episodes[i],self.episodes[i+1])
-        self.trainDiscriminator(data_batch,generator,self.episodes[self.episode_num-1])
-    
-    # @tf.function
-    # def trainGeneratorWithEpisodes(self,dataBatch,generator,customMask=False):
-    #     with tf.GradientTape(persistent=True) as tape:
-    #         total_G_episodes_loss=self.calcTotalEpisodesLoss(dataBatch,generator,customMask)
-    #     # Learning and update weights
-    #     G_loss_gradients = tape.gradient(total_G_episodes_loss,generator.trainable_variables)
-    #     self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
-    #     self.epoch.assign_add(1)
-    #     return total_G_episodes_loss
+        self.trainDiscriminator(data_batch,mask,hints,generator,self.episodes[self.episode_num-1])
     
     @tf.function
-    def trainGeneratorWithDiscriminators(self,dataBatch,generator,discriminators,customMask=False):
+    def trainGeneratorWithDiscriminators(self,dataBatch,mask,hints,generator,discriminators):
         with tf.GradientTape(persistent=True) as tape:
-            total_G_episodes_loss=self.calcMultiGeneratorLoss(dataBatch,generator,discriminators,customMask)
+            total_G_episodes_loss=self.calcMultiGeneratorLoss(dataBatch,mask,hints,generator,discriminators)
         # Learning and update weights
         G_loss_gradients = tape.gradient(total_G_episodes_loss,generator.trainable_variables)
         self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
@@ -431,7 +390,7 @@ class GAN(Model):
         return total_G_episodes_loss
         
     @tf.function    
-    def trainGenerator(self,dataBatch,generator,discriminator,customMask=False):
+    def trainGenerator(self,dataBatch,mask,hints,generator,discriminator):
         '''
         A function that train that generator against respective discriminator.
         Args:
@@ -441,11 +400,9 @@ class GAN(Model):
             customMask: a custom mask to be applied, if not provided, a random mask would be generated.
         '''
         with tf.GradientTape(persistent=True) as tape:
-            G_loss,D_loss=self.calcLoss(dataBatch,generator,discriminator,customMask)
+            G_loss,D_loss=self.calcLoss(dataBatch,mask,hints,generator,discriminator)
         # Learning and update weights
         G_loss_gradients = tape.gradient(G_loss,generator.trainable_variables)
         self.optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
         return G_loss,D_loss
     
-#%%
- 

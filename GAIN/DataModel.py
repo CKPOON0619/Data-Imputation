@@ -24,6 +24,36 @@ def createDenormaliser(dataRange):
     dataMin,dataMax=dataRange
     return lambda dataTensor:(dataTensor)*(dataMax-dataMin+1e-6)+dataMin
 
+def createMask(data,maskRatio):
+    '''
+    Args:
+        data: tensor to be masked
+        maskRatio: proportion of entries to be marked as 1
+    Returns: 
+        0,1 matrix of the same shape as data
+    '''
+    return tf.dtypes.cast((tf.random.uniform(tf.shape(data),minval=0,maxval=1)>(1-maskRatio)),dtype=tf.float32)
+
+def createHint(mask,hintRate):
+    '''
+    Args:
+        mask: mask of the data, 0,1 matrix of the same shape as data.
+        hintRate: the rate of reveal the truth
+    return 
+        hintMask: mask for creating hints with 1,0 values. Same size as X.
+        hints: hints matrix with 1,0.5,0 values. Same size as X.
+    '''
+    hintMask=createMask(mask,1-hintRate)
+    hints=hintMask*mask+(1-hintMask)*0.5
+    return hintMask,hints
+
+def createMaskNHints(data,maskRatio,hintRate):
+    mask=createMask(data,maskRatio)
+    hintMask,hints=createHint(mask,hintRate)
+    return mask,hintMask,hints
+    
+    
+    
 #%% Data Model
 class DataModel():
     """
@@ -47,7 +77,7 @@ class DataModel():
         self.denormaliser=createDenormaliser(self.range)
 
     # Setting up data pipeline
-    def getPipeLine(self,train_rate,batch_ratio,repeat):
+    def getPipeLine(self,train_rate,batch_ratio,repeat,p_miss=0.5,p_hints=0.5):
         """
         This function create and return a tensorflow data object with provided arguments.
 
@@ -64,9 +94,8 @@ class DataModel():
         train_batch=int(train_size*batch_ratio)
         test_batch=int(test_size*batch_ratio)
         
-        dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size)
+        dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size).map(lambda x: [x,createMaskNHints(x,p_miss,p_hints)])
         dataset_train=dataset.take(train_size).batch(train_batch,drop_remainder=True).repeat(repeat)
-        
         dataset_test=dataset.skip(train_size).batch(test_batch,drop_remainder=True).repeat(int(repeat*train_rate/(1-train_rate)))
         return dataset_train,dataset_test
 
