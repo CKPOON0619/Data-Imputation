@@ -1,46 +1,35 @@
 #%%
-from tensorflow import concat, split, identity_n, squeeze, TensorShape,Variable,float32
-from tensorflow.keras import Model
+import tensorflow as tf
 
-class MemoiseIn(Model):
-    def __init__(self,model,size):
-        super(MemoiseIn, self).__init__()
-        self.size=size
+class Memorise(tf.Module):
+    def __init__(self,model,memory_size,stack_size,arg_sizes,name=None):
+        super(Memorise, self).__init__(name=name)
+        memorySize=tf.TensorShape([memory_size,stack_size,tf.reduce_sum(arg_sizes)])
+        self.memory = tf.Variable(tf.zeros(memorySize),trainable=False)
         self.model=model
-        self.pointer=0
-    def initiateMemory(self,*inputs):
-        self.memory=[identity_n(inputs) for j in range(0,self.size)]
-    def __pointNext(self):
-        self.pointer=(self.pointer+1)%self.size
-    def call(self,*args):
-        self.argLen=len(args)
-        self.memory[self.pointer]=identity_n(args)
-        self.__pointNext()
+        self.arg_sizes=arg_sizes
+        self.memory_size=memory_size
+        self.pointer=tf.Variable(0,trainable=False,dtype=tf.int32)
+
+    def __call__(self, *args):
+        self._update(self.pointer,tf.concat(args,axis=1))
+        self.pointer.assign(tf.math.floormod(self.pointer+1,self.memory_size))
         return self.model(*args)
-    def replay(self):
-        inputs=split(self.memory,axis=1,num_or_size_splits=self.argLen)
-        return self.model(*[squeeze(x) for x in inputs])
-    def recall(self):
-        return split(self.memory,axis=1,num_or_size_splits=self.argLen)
+    
+    def _update(self,entry,data):
+        self.indice=tf.reshape(self.pointer,[1,1])
+        self.newEntry=tf.expand_dims(data,0)
+        self.memory.assign(tf.tensor_scatter_nd_update(self.memory,self.indice,self.newEntry))
         
+        
+    def replay(self):
+        inputs=tf.split(self.memory,axis=2,num_or_size_splits=self.arg_sizes)
+        return self.model(*[tf.reshape(x,[-1,self.arg_sizes[idx]]) for idx,x in enumerate(inputs)])
     
-#%%
-class MemoiseOut(Model):
-    def __init__(self,model,size):
-        super(MemoiseOut, self).__init__()
-        self.size=size
-        self.model=model
-        self.pointer=0
-    
-    def initiateMemory(self,*inputs):
-        outputs=self.model(*inputs)
-        self.memory=[identity_n(outputs) for i in range(self.size)]
-    
-    def __pointNext(self):
-        self.pointer=(self.pointer+1)%self.size
-    
-    def call(self,*args):
-        output=self.model(*args)
-        self.memory[self.pointer]=identity_n(output)
-        self.__pointNext()
-        return output
+    def recall(self):
+        inputs=tf.split(self.memory,axis=2,num_or_size_splits=self.arg_sizes)
+        return [tf.reshape(x,[-1,self.arg_sizes[idx]]) for idx,x in enumerate(inputs)]
+
+
+
+# %%
