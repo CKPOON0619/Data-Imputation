@@ -204,7 +204,7 @@ def cloneModel(model,MyModel,inputDim):
     return newModel
 
 def cloneWeights(model1,model2):
-        '''
+    '''
     Clone a trainable variables of two instance of a keras model class from one to another.
     
     Args:
@@ -313,7 +313,8 @@ def calcMultiGeneratorLoss(X,mask,hints,generator,discriminators,alpha):
         generator_losses.append(getGeneratorLoss(alpha,discriminate(discriminators[i],X_hat,hints),X,generated_X,mask))
     return tf.math.add_n(generator_losses)
 
-def trainGeneratorWithDiscriminators(dataBatch,mask,hints,generator,discriminators,optimizer,alpha):
+
+def trainGeneratorWithDiscriminator(dataBatch,mask,hints,generator,discriminator,optimizer,alpha):
     '''
     A function that train the generator against multiple discriminators and return the generator loss.
     
@@ -321,6 +322,28 @@ def trainGeneratorWithDiscriminators(dataBatch,mask,hints,generator,discriminato
         dataBatch: data input.
         generator: A generator model for the GAIN structure.
         discriminator: A discriminator model for the GAIN structure.
+        optimizer: A tensorflow optimizer object.
+    
+    Return:
+        Total loss of the generator.
+    
+    '''
+    [generated_X,X_hat]=generate(generator,dataBatch,mask)
+    with tf.GradientTape(persistent=True) as tape:
+        total_G_episodes_loss=getGeneratorLoss(alpha,discriminate(discriminator,X_hat,hints),X,generated_X,mask)
+    # Learning and update weights
+    G_loss_gradients = tape.gradient(total_G_episodes_loss,generator.trainable_variables)
+    optimizer.apply_gradients(zip(G_loss_gradients, generator.trainable_variables))
+    return total_G_episodes_loss
+
+def trainGeneratorWithDiscriminators(dataBatch,mask,hints,generator,discriminators,optimizer,alpha):
+    '''
+    A function that train the generator against multiple discriminators and return the generator loss.
+    
+    Args:
+        dataBatch: data input.
+        generator: A generator model for the GAIN structure.
+        discriminator: A list of discriminator class model instances for the GAIN structure.
         optimizer: A tensorflow optimizer object.
     
     Return:
@@ -374,13 +397,6 @@ def unrollDiscriminator(data_batch,mask,hints,X_hat,discriminator,optimizer,epis
     # trainDiscriminatorWithGenerator(data_batch,mask,hints,generator,episodes[episode_num-1],optimizer,p_miss)
 
 #%% GAN Model
-
-# Model params
-defaultParams={
-    'p_miss': 0.5, 
-    'alpha': 0, 
-    'episode_num': 5
-    }
     
 class GAN():
     '''
@@ -394,7 +410,9 @@ class GAN():
         optimizer: A tensorflow optimizer class object
     '''
     def __init__(self,summary_writer=False, hyperParams={}, optimizer=tf.keras.optimizers.Adam()):
-        self.__dict__.update(defaultParams)
+        self.alpha=0
+        self.p_miss=0.5
+        self.episode_num=5
         self.__dict__.update(hyperParams)
         self.optimizer = optimizer
         self.epoch = tf.Variable(0,dtype=tf.int64)
@@ -459,7 +477,7 @@ class GAN():
         Return:
             Total loss of the discriminator.
         '''
-        return calcMultiGeneratorLoss(X,mask,hints,genreator,discriminators,self.alpha)
+        return calcMultiGeneratorLoss(X,mask,hints,generator,discriminators,self.alpha)
     
     def initialiseUnRolling(self,discriminator,myDiscriminator,dim):
         '''
@@ -491,10 +509,12 @@ class GAN():
         return trainDiscriminator(dataBatch,X_hat,mask,hints,discriminator,self.optimizer,self.p_miss)
     
     @tf.function
-    def trainDiscriminator_Replay(self,dataBatch,X_hat,mask_recalled,hints,discriminator_with_memory):
+    def trainDiscriminatorWithMemory(self,dataBatch,X_hat,mask_recalled,hints,discriminator_with_memory):
         '''
         A function that train the discriminator against given generator.
         Args:
+            dataBatch: The data input.
+            X_hat: A matrix of generated data where each row a record entry.
             mask_recalled: Mask recalled from mask memoriser, sync-ed with discriminator memory.
             discriminator_with_memory: A discriminator model wrapped in memoriser module.
         '''
