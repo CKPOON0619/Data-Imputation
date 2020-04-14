@@ -509,19 +509,6 @@ class GAN():
         return trainDiscriminator(dataBatch,X_hat,mask,hints,discriminator,self.optimizer,self.p_miss)
     
     @tf.function
-    def trainDiscriminatorWithMemory(self,dataBatch,X_hat,mask_recalled,hints,discriminator_with_memory):
-        '''
-        A function that train the discriminator against given generator.
-        Args:
-            dataBatch: The data input.
-            X_hat: A matrix of generated data where each row a record entry.
-            mask_recalled: Mask recalled from mask memoriser, sync-ed with discriminator memory.
-            discriminator_with_memory: A discriminator model wrapped in memoriser module.
-        '''
-        return trainDiscriminator(dataBatch,X_hat,mask_recalled,hints,discriminator_with_memory,self.optimizer,self.p_miss)
-    
-    
-    @tf.function
     def trainDiscriminatorWithGenerator(self,dataBatch,mask,hints,generator,discriminator):
         '''
         A function that train the discriminator against given generator.
