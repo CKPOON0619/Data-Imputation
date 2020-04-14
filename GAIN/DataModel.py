@@ -93,7 +93,7 @@ class DataModel():
         test_size=self.sample_size-train_size
         train_batch=int(train_size*batch_ratio)
         test_batch=int(test_size*batch_ratio)
-        
+        self.train_batch_size=int(train_batch)
         dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size).map(lambda x: [x,createMaskNHints(x,p_miss,p_hints)])
         dataset_train=dataset.take(train_size).batch(train_batch,drop_remainder=True).repeat(repeat)
         dataset_test=dataset.skip(train_size).batch(test_batch,drop_remainder=True).repeat(int(repeat*train_rate/(1-train_rate)))
