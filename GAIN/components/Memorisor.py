@@ -1,7 +1,5 @@
 #%%
 import tensorflow as tf
-
-#%% 
 # Memoriser as wrapper using cusom pointer
 class Memorise(tf.Module):
     '''
