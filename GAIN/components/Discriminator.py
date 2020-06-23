@@ -1,21 +1,6 @@
 import tensorflow as tf
 from tensorflow import Module
 
-
-def get_generator_logLoss(discriminations,mask):
-    '''
-    Get the logLoss of the generated values.
-
-    Args:
-        discriminations: probability predicted by discriminator that a data entry is real.
-        mask:a matrix with the same size as discriminated_probs. Entry value 1 indicate a genuine value, value 0 indicate missing(generated) value.
-    Returns:
-        loss value contributed by generated value imagined by the generator.
-    
-    '''
-    ## Likelinhood loss caused by discriminable values
-    return -tf.reduce_mean((1-mask) * tf.math.log(discriminations + 1e-8))
-
 def cloneWeights(model1,model2):
     '''
     Clone a trainable variables of two instance of a keras model class from one to another.
