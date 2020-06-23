@@ -2,19 +2,6 @@ import tensorflow as tf
 from tensorflow import Module
 
 
-def get_generator_logLoss(discriminations,mask):
-    '''
-    Get the logLoss of the generated values.
-
-    Args:
-        discriminations: probability predicted by discriminator that a data entry is real.
-        mask:a matrix with the same size as discriminated_probs. Entry value 1 indicate a genuine value, value 0 indicate missing(generated) value.
-    Returns:
-        loss value contributed by generated value imagined by the generator.
-    
-    '''
-    ## Likelinhood loss caused by discriminable values
-    return -tf.reduce_mean((1-mask) * tf.math.log(discriminations + 1e-8))
 
 def cloneWeights(model1,model2):
     '''
@@ -46,7 +33,7 @@ def cloneModel(model,MyModel,inputDim):
 
 def discrimination_logLoss(discriminations,hints,mask,missRate):
     ## log Likelinhood comparison to ground truth + sample rebalancing
-    discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminations + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminations + 1e-8))
+    discriminator_loss=tf.reduce_mean(mask * tf.math.log(discriminations + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminations + 1e-8))
     return discriminator_loss
     
 
@@ -152,9 +139,9 @@ class myDiscriminator(Module):
         with tf.GradientTape(persistent=True) as tape:
             discriminations=self.discriminate(adjusted_generated_x,hints)
             D_loss=discrimination_logLoss(discriminations,hints,mask,missRate)
-        D_loss_gradients = tape.gradient(D_loss,self.body.trainable_variables)
+        D_loss_gradients = tape.gradient(-D_loss,self.body.trainable_variables)
         optimizer.apply_gradients(zip(D_loss_gradients, self.body.trainable_variables))
-        return D_loss   
+        return D_loss_gradients   
         
     def call_episode(self,episode_index,adjusted_generated_x,hints):
         return self.episodes[episode_index](tf.concat(axis = 1, values = [adjusted_generated_x,hints]))

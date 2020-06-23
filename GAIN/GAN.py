@@ -5,12 +5,13 @@ import numpy as np
 from tensorflow.keras import Model
 from datetime import datetime
 from os import getcwd
+from components.Orchestrator import Orchestrator
 from components.Discriminator import myDiscriminator
 
 #%%
-class GAN():
+class GAN(Orchestrator):
     '''
-    Generative Adversarial Net(GAN) structure for Generative Adversarial Information Net(GAIN).
+    GAN orchestrator for Generative Adversarial Information Net(GAIN).
     Args:
         logdir: logging directory for tensorboard. Default to be "./logs/tf_logs(dateTime)"
         hyperParams: hyperparameters for the GAN model, default to be {'p_miss': 0.5, 'alpha': 0, episode_num: 5}
@@ -23,35 +24,7 @@ class GAN():
         self.alpha=0
         self.p_miss=0.5
         self.episode_num=5
-        self.__dict__.update(hyperParams)
-        self.optimizer = optimizer
-        self.epoch = tf.Variable(0,dtype=tf.int64)
-        if(summary_writer):
-            self.summary_writer=summary_writer
-        else:
-            self.set_logDir()
-        
-    def setHyperParams(self,hyperParams):
-        '''
-        A function to update model hyperParams.
-        Args: 
-            hyperParams: hyperparameters for the GAN model:
-                p_miss: missing rate of data
-                p_hint: proportion of data entry to be given as known answer to the discriminator. 
-                alpha: regulation parameters.
-        '''
-        self.__dict__.update(hyperParams)
-
-    def set_logDir(self,logdir= getcwd()+'\\logs\\tf_logs' + datetime.now().strftime("%Y%m%d-%H%M%S")):
-        '''
-        A function to reset logging directory and training epoch.
-        Args: 
-            logdir: logging directory for tensorboard
-        '''
-        self.logdir = logdir
-        os.makedirs(logdir, exist_ok=True)
-        self.summary_writer = tf.summary.create_file_writer(logdir)
-        print('tensorboard --logdir {}'.format(logdir)+' --host localhost')
+        super().__init__(summary_writer=summary_writer, hyperParams=hyperParams, optimizer=optimizer)
 
     def tensorboard_log(self,prefix,dataBatch,mask,hints,hintMask,generator,discriminator):
         generated_data=generator.generate(dataBatch,mask)
@@ -60,6 +33,7 @@ class GAN():
         generator.performance_log(self.summary_writer,prefix,dataBatch,mask,hints,hintMask,discriminator.discriminate,self.epoch)
         self.epoch.assign_add(1)
 
+    @tf.function
     def train(self,dataBatch,mask,hints,generator,discriminator,steps=1):
         '''
         A function that train generator and respective discriminator.
@@ -75,7 +49,7 @@ class GAN():
             generated_data=generator.generate(dataBatch,mask)
             adjusted_generated_data=mask*dataBatch+generated_data*(1-mask)
             discriminator.train(adjusted_generated_data,mask,hints,self.p_miss,self.optimizer)
-        generator.train(dataBatch,mask,hints,discriminator.discriminate,self.optimizer,self.alpha)
+        generator.train_with_discriminator(dataBatch,mask,hints,discriminator.discriminate,self.optimizer,self.alpha)
 
     def train_with_unrolling(self,dataBatch,mask,hints,generator,discriminator,unrolling_steps=1):
         '''

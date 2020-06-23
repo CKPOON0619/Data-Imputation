@@ -15,7 +15,7 @@ def get_generator_logLoss(discriminations,mask):
     
     '''
     ## Likelinhood loss caused by discriminable values
-    return -tf.reduce_sum((1-mask) * tf.math.log(discriminations + 1e-8))/tf.reduce_sum(1-mask)
+    return tf.reduce_sum((1-mask) * tf.math.log(discriminations + 1e-8))/tf.reduce_sum(1-mask)
 
 
 def generate_random(input):
@@ -95,7 +95,7 @@ class myGenerator(Module):
     def load(self,path):
         self.body=tf.keras.models.load_model(path)
 
-    def train(self,data_batch,mask,hints,discriminate_fn,optimizer,alpha=1):
+    def train_with_discriminator(self,data_batch,mask,hints,discriminate_fn,optimizer,alpha=1):
         '''
         The training the generator.
 
@@ -112,11 +112,32 @@ class myGenerator(Module):
             generated_data=self.generate(data_batch,mask)
             adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
             discriminations=discriminate_fn(adjusted_generated_data,hints)
-            # loss=get_generator_logLoss(discriminated_probs,mask)+alpha*get_generator_truth_logLoss(data_batch,generated_data,mask)
             loss=get_generator_logLoss(discriminations,mask)        
-        loss_gradients = tape.gradient(loss,self.body.trainable_variables)
+        loss_gradients = tape.gradient(-loss,self.body.trainable_variables)
         optimizer.apply_gradients(zip(loss_gradients, self.body.trainable_variables))
         return loss
+    
+    def train_with_critic(self,data_batch,mask,hints,criticise_fn,optimizer,alpha=1):
+        '''
+        The training the generator.
+
+        Args:
+            data_batch: training data.
+            mask: a matrix with the same size as discriminated_probs. Entry value 1 indicate a genuine value, value 0 indicate missing(generated) value.
+            hints: hints matrix for the discriminator. 1 = genuine, 0 = generated, 0.5 = unknown
+            loss_fn: loss function that evaluate the loss value of generated values with input signature (x,generated_x,mask,hints,alpha).
+            optimizer: optimizer used for training the discriminator.
+        Returns:
+            discriminator_loss: loss value for discriminator
+        '''
+        with tf.GradientTape(persistent=True) as tape:
+            generated_data=self.generate(data_batch,mask)
+            adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
+            critics=criticise_fn(adjusted_generated_data,hints)
+            critic_loss=tf.reduce_mean(critics)      
+        loss_gradients = tape.gradient(-critic_loss,self.body.trainable_variables)
+        optimizer.apply_gradients(zip(loss_gradients, self.body.trainable_variables))
+        return critic_loss
     
     def performance_log(self,writer,prefix,data_batch,mask,hints,hintMask,discriminate_fn,epoch):  
         '''
