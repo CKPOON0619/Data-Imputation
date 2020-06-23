@@ -95,7 +95,7 @@ class myGenerator(Module):
     def load(self,path):
         self.body=tf.keras.models.load_model(path)
 
-    def train(self,data_batch,mask,hints,discriminate_fn,optimizer,alpha=1):
+    def train_with_discrimination(self,data_batch,mask,hints,discriminate_fn,optimizer,alpha=1):
         '''
         The training the generator.
 
@@ -106,7 +106,7 @@ class myGenerator(Module):
             loss_fn: loss function that evaluate the loss value of generated values with input signature (x,generated_x,mask,hints,alpha).
             optimizer: optimizer used for training the discriminator.
         Returns:
-            discriminator_loss: loss value for discriminator
+            discrimination_loss: loss value for discriminator
         '''
         with tf.GradientTape(persistent=True) as tape:
             generated_data=self.generate(data_batch,mask)
