@@ -118,6 +118,28 @@ class myGenerator(Module):
         optimizer.apply_gradients(zip(loss_gradients, self.body.trainable_variables))
         return loss
     
+    def train_with_critic(self,data_batch,mask,hints,criticise_fn,optimizer,alpha=1):
+        '''
+        The training the generator.
+
+        Args:
+            data_batch: training data.
+            mask: a matrix with the same size as discriminated_probs. Entry value 1 indicate a genuine value, value 0 indicate missing(generated) value.
+            hints: hints matrix for the discriminator. 1 = genuine, 0 = generated, 0.5 = unknown
+            loss_fn: loss function that evaluate the loss value of generated values with input signature (x,generated_x,mask,hints,alpha).
+            optimizer: optimizer used for training the discriminator.
+        Returns:
+            discriminator_loss: loss value for discriminator
+        '''
+        with tf.GradientTape(persistent=True) as tape:
+            generated_data=self.generate(data_batch,mask)
+            adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
+            critics=criticise_fn(adjusted_generated_data,hints)
+            critic_loss=-tf.reduce_mean(critics)      
+        loss_gradients = tape.gradient(critic_loss,self.body.trainable_variables)
+        optimizer.apply_gradients(zip(loss_gradients, self.body.trainable_variables))
+        return critic_loss
+    
     def performance_log(self,writer,prefix,data_batch,mask,hints,hintMask,discriminate_fn,epoch):  
         '''
         To be filled.

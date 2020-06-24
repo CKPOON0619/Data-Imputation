@@ -45,3 +45,8 @@ class Orchestrator():
         os.makedirs(logdir, exist_ok=True)
         self.summary_writer = tf.summary.create_file_writer(logdir)
         print('tensorboard --logdir {}'.format(logdir)+' --host localhost')
+
+# %%
+
+
+# %%
