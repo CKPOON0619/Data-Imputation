@@ -55,14 +55,14 @@ class myDiscriminator(Module):
     def load(self,path):
         self.body=tf.keras.models.load_model(path)
         
-    def performance_log(self,writer,prefix,adjusted_generated_x,hints,mask,hintMask,missRate,epoch):
+    def performance_log(self,writer,prefix,adjusted_generated_x,hints,mask,hint_mask,missRate,epoch):
         '''
         To be filled.
         '''    
         discriminated_probs=self.discriminate(adjusted_generated_x,hints)
         discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
-        truth_loss=tf.gather_nd(discriminated_probs,tf.where(mask*(1-hintMask)))
-        fake_loss=tf.gather_nd(discriminated_probs,tf.where((1-mask)*(1-hintMask)))
+        truth_loss=tf.gather_nd(discriminated_probs,tf.where(mask*(1-hint_mask)))
+        fake_loss=tf.gather_nd(discriminated_probs,tf.where((1-mask)*(1-hint_mask)))
         with writer.as_default():
             tf.summary.scalar(prefix+' discriminator loss',discriminator_loss, step=epoch) 
             tf.summary.histogram(prefix+' hidden truth discrimination',truth_loss, step=epoch) 

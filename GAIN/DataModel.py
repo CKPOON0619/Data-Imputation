@@ -40,17 +40,17 @@ def createHint(mask,hintRate):
         mask: mask of the data, 0,1 matrix of the same shape as data.
         hintRate: the rate of reveal the truth
     return 
-        hintMask: mask for creating hints with 1,0 values. Same size as X.
+        hint_mask: mask for creating hints with 1,0 values. Same size as X.
         hints: hints matrix with 1,0.5,0 values. Same size as X.
     '''
-    hintMask=createMask(mask,1-hintRate)
-    hints=hintMask*mask+(1-hintMask)*0.5
-    return hintMask,hints
+    hint_mask=createMask(mask,1-hintRate)
+    hints=hint_mask*mask+(1-hint_mask)*0.5
+    return hint_mask,hints
 
 def createMaskNHints(data,maskRatio,hintRate):
     mask=createMask(data,maskRatio)
-    hintMask,hints=createHint(mask,hintRate)
-    return mask,hintMask,hints
+    hint_mask,hints=createHint(mask,hintRate)
+    return mask,hint_mask,hints
     
     
     

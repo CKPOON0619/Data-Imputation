@@ -21,10 +21,16 @@ class WGAN(Orchestrator):
         optimizer: A tensorflow optimizer class object
     '''
     def __init__(self,summary_writer=False, hyperParams={}, optimizer=tf.keras.optimizers.Adam()):
-        self.alpha=0
+        self.alpha=10
         self.episode_num=5
         super().__init__(summary_writer=summary_writer, hyperParams=hyperParams, optimizer=optimizer)
 
+    def tensorboard_log(self,prefix,data_batch,mask,hints,hint_mask,generator,critic):
+        generated_data=generator.generate(data_batch,mask)
+        adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+        critic.performance_log(self.summary_writer,prefix,data_batch,adjusted_generated_data,mask,hints,self.alpha,self.epoch)
+        generator.performance_log_with_critic(self.summary_writer,prefix,data_batch,mask,hints,hint_mask,critic.criticise,self.epoch)
+        self.epoch.assign_add(1)
 
     @tf.function
     def train(self,data_batch,mask,hints,generator,critic,steps=1):
