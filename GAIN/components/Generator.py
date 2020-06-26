@@ -62,7 +62,7 @@ def get_generated_value_errors(mask,hint_mask,x,generated_x):
     ## Check the difference between generated value and actual value
     return tf.gather_nd((generated_x-x),tf.where((1-mask)*(1-hint_mask)))
 
-def get_generator_truth_error(data_batch,generated_data,mask):
+def get_total_generator_truth_error(data_batch,generated_data,mask):
     '''
     Get the logLoss of generated true values.
 
@@ -135,7 +135,7 @@ class myGenerator(Module):
             generated_data=self.generate(data_batch,mask)
             adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
             critics=criticise_fn(adjusted_generated_data,hints)
-            critic_loss=tf.reduce_mean(critics)      
+            critic_loss=-tf.reduce_mean(critics)      
         loss_gradients = tape.gradient(critic_loss,self.body.trainable_variables)
         optimizer.apply_gradients(zip(loss_gradients, self.body.trainable_variables))
         return critic_loss
@@ -151,7 +151,7 @@ class myGenerator(Module):
         generator_loss=get_generator_logLoss(discriminated_probs,mask)
         with writer.as_default():
             tf.summary.scalar(prefix+' generator_loss', generator_loss, step=epoch) 
-            tf.summary.scalar(prefix+' know value regeneration error', get_generator_truth_error(data_batch,generated_data,mask), step=epoch)
+            tf.summary.scalar(prefix+' know value regeneration error', get_total_generator_truth_error(data_batch,generated_data,mask), step=epoch)
             tf.summary.histogram(prefix+' hidden value generation errors',get_generated_value_errors(mask,hint_mask,data_batch,generated_data), step=epoch) 
             tf.summary.histogram(prefix+' generated last column distribution',get_last_column(generatedLastCol), step=epoch) 
             tf.summary.histogram(prefix+' actual last column distribution',get_last_column(data_batch), step=epoch) 
@@ -164,14 +164,15 @@ class myGenerator(Module):
         generatedLastCol=self.generate(data_batch,get_test_mask(data_batch))
         generated_data=self.generate(data_batch,mask)
         adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
-        generated_critics=criticise_fn(adjusted_generated_data,hints)
-        genuine_critics=criticise_fn(data_batch,hints)
-        critic_loss=-tf.reduce_mean(generated_critics)+tf.reduce_mean(genuine_critics) 
+        generated_critics_mean=tf.reduce_mean(criticise_fn(adjusted_generated_data,hints))
+        genuine_critics_mean=tf.reduce_mean(criticise_fn(data_batch,hints))
+        critic_loss=generated_critics_mean-genuine_critics_mean
         with writer.as_default():
-            tf.summary.scalar(prefix+' know value regeneration error', get_generator_truth_error(data_batch,generated_data,mask), step=epoch)
-            tf.summary.histogram(prefix+' hidden value generation errors',get_generated_value_errors(mask,hint_mask,data_batch,generated_data), step=epoch) 
+            tf.summary.scalar(prefix+' know value regeneration error', get_total_generator_truth_error(data_batch,generated_data,mask), step=epoch)
             tf.summary.scalar(prefix+' critic_loss', critic_loss, step=epoch)
-            tf.summary.histogram(prefix+' generated_critics',generated_critics, step=epoch) 
+            tf.summary.scalar(prefix+' genuine_critics_mean',genuine_critics_mean, step=epoch) 
+            tf.summary.scalar(prefix+' generated_critics_mean',generated_critics_mean, step=epoch) 
+            tf.summary.histogram(prefix+' hidden value generation errors',get_generated_value_errors(mask,hint_mask,data_batch,generated_data), step=epoch) 
             tf.summary.histogram(prefix+' generated last column distribution',get_last_column(generatedLastCol), step=epoch) 
             tf.summary.histogram(prefix+' actual last column distribution',get_last_column(data_batch), step=epoch) 
 
