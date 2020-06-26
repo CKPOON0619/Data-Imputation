@@ -32,7 +32,6 @@ class WGAN(Orchestrator):
         generator.performance_log_with_critic(self.summary_writer,prefix,data_batch,mask,hints,hint_mask,critic.criticise,self.epoch)
         self.epoch.assign_add(1)
 
-    @tf.function
     def train(self,data_batch,mask,hints,generator,critic,steps=1):
         '''
         A function that train generator and respective discriminator.

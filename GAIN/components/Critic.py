@@ -82,7 +82,7 @@ class myCritic(Module):
             self.episodes=[]
         for i in range(0,self.episode_num):
             newEpisode=tf.keras.models.clone_model(self.body)
-            newEpisode.build(None,dim)
+            newEpisode.build(None,dim*2)
             cloneWeights(self.body,newEpisode)
             if i > len(self.episodes)-1:
                 self.episodes.append(newEpisode)
@@ -125,7 +125,7 @@ class myCritic(Module):
                     for interpolated_critic_gradient in interpolated_critic_gradients:
                         gradients_square_sum=gradients_square_sum+tf.reduce_sum(tf.square(interpolated_critic_gradient),axis=[-1,1])
                     penalty_regulation=tf.reduce_mean(tf.square(tf.math.sqrt(gradients_square_sum)-1))                    
-                critic_loss=-mean_critic_diff-alpha*penalty_regulation
+                critic_loss=mean_critic_diff+alpha*penalty_regulation
                 critic_loss_gradients = tape.gradient(critic_loss,self.episodes[i].trainable_variables)
                 optimizer.apply_gradients(zip(critic_loss_gradients,self.episodes[i].trainable_variables))
             cloneWeights(self.episodes[i],self.episodes[i+1])
@@ -133,7 +133,7 @@ class myCritic(Module):
             with tf.GradientTape(persistent=True) as tape:
                 generated_critics=self.call_episode(i,adjusted_generated_x,hints)
                 genuine_critics=self.criticise(data_batch,hints)
-                mean_critic_diff=tf.reduce_mean(generated_critics-genuine_critics)
+                mean_critic_diff=tf.reduce_mean(tf.abs(generated_critics-genuine_critics))
                 with tf.GradientTape() as tape2:           
                     interpolated_critics=tf.reduce_sum(self.call_episode(self.episode_num-1,interpolated_data,hints),axis=1)
                 interpolated_critic_gradients = tape2.jacobian(interpolated_critics,self.body.trainable_variables)
@@ -152,14 +152,16 @@ class myCritic(Module):
         return mean_critics_diff
        
     def calc_critic_penalty(self,interpolated_data,hints):
-        with tf.GradientTape() as tape:           
-            interpolated_critics=tf.reduce_sum(self.body(interpolated_data),axis=1)
-        interpolated_critic_gradients = tape.jacobian(interpolated_critics,self.body.trainable_variables)
-        gradients_square_sum=tf.reduce_sum(tf.zeros(shape=tf.shape(interpolated_critic_gradients[0]),dtype=tf.float32),axis=[-1,1])
-        for interpolated_critic_gradient in interpolated_critic_gradients:
-            gradients_square_sum=gradients_square_sum+tf.reduce_sum(tf.square(interpolated_critic_gradient),axis=[-1,1])
-        penalty_regulation=tf.reduce_mean(tf.square(tf.math.sqrt(gradients_square_sum)-1))
-        return penalty_regulation
+        with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
+            tape.watch(interpolated_data)           
+            interpolated_critics=self.criticise(interpolated_data,hints)
+        interpolated_critic_gradients = tape.gradient(interpolated_critics,interpolated_data)
+        self.interpolated_data=interpolated_data
+        self.interpolated_critics=interpolated_critics
+        self.interpolated_critic_gradients=interpolated_critic_gradients
+        normed_gradients = tf.sqrt(tf.reduce_sum(tf.square(interpolated_critic_gradients), axis=1))
+        gradient_penalty = tf.reduce_mean(tf.square(normed_gradients-1.))
+        return gradient_penalty
               
     def train(self,data_batch,adjusted_generated_data,mask,hints,alpha,optimizer):
         '''
@@ -177,11 +179,13 @@ class myCritic(Module):
         '''
         
         tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
-        interpolated_data=tau*adjusted_generated_data+(1-tau)*data_batch
+        interpolated_data=data_batch+tau*(adjusted_generated_data-data_batch)
         with tf.GradientTape() as tape:
             mean_critics_diff=self.calc_critic_diff(data_batch,adjusted_generated_data,hints)
-            penalty_regulation=self.calc_critic_penalty(interpolated_data,hints)
-            critic_loss=-mean_critics_diff-alpha*penalty_regulation
+            gradient_penalty=self.calc_critic_penalty(interpolated_data,hints)
+            critic_loss=mean_critics_diff+alpha*gradient_penalty
+        self.gradient_penalty=gradient_penalty
+        self.mean_critics_diff=mean_critics_diff
         critic_loss_gradient = tape.gradient(critic_loss,self.body.trainable_variables)
         optimizer.apply_gradients(zip(critic_loss_gradient, self.body.trainable_variables))
         return critic_loss
