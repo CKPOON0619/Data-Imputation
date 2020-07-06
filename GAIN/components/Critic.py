@@ -63,7 +63,7 @@ class myCritic(Module):
         interpolated_data=tau*adjusted_generated_data+(1-tau)*data_batch
         generated_critics=self.criticise(adjusted_generated_data,hints)
         genuine_critics=self.criticise(data_batch,hints)
-        mean_critics_diff=-tf.reduce_mean(generated_critics)-tf.reduce_mean(genuine_critics)
+        mean_critics_diff=tf.reduce_mean(generated_critics)-tf.reduce_mean(genuine_critics)
         penalty_regulation=self.calc_critic_penalty(interpolated_data,hints)
         critic_loss=-mean_critics_diff-alpha*penalty_regulation
         with writer.as_default():
@@ -156,9 +156,6 @@ class myCritic(Module):
             tape.watch(interpolated_data)           
             interpolated_critics=self.criticise(interpolated_data,hints)
         interpolated_critic_gradients = tape.gradient(interpolated_critics,interpolated_data)
-        self.interpolated_data=interpolated_data
-        self.interpolated_critics=interpolated_critics
-        self.interpolated_critic_gradients=interpolated_critic_gradients
         normed_gradients = tf.sqrt(tf.reduce_sum(tf.square(interpolated_critic_gradients), axis=1))
         gradient_penalty = tf.reduce_mean(tf.square(normed_gradients-1.))
         return gradient_penalty
