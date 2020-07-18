@@ -12,7 +12,7 @@ from GAN import GAN
 from pathlib import Path
 
 #%% Data Model
-file='measureGenerator'
+file='measureGenerator_noRand'
 data_path="{}\\data\\{}.csv".format(Path(getcwd()).parent,file)
 Data=DataModel(data_path)
 
@@ -26,7 +26,7 @@ Model3=GAN(Generator,Discriminator,summary_writer=Model1.summary_writer,hyperPar
 #%% Run - 1 : 
 # First train the discriminator against a random generator to increase its stability
 counter=0
-train,test=Data.getPipeLine(p_miss=0.5,p_hints=0.5,train_rate=0.8,batch_ratio=0.05,repeat=50)
+train,test=Data.getPipeLine(p_miss=0.5,p_hints=0.5,train_rate=0.8,batch_ratio=0.2,repeat=1000)
 test=iter(test)
 for dat_train,[mask,hint_mask,hints] in tqdm(train):
     Model1.train_discriminator_with_random(dat_train,mask,hints)
@@ -36,7 +36,7 @@ for dat_train,[mask,hint_mask,hints] in tqdm(train):
 #%% Run - 2 : 
 # First train the discriminator against a proper generator
 counter=0
-train,test=Data.getPipeLine(p_miss=0.5,p_hints=0.5,train_rate=0.8,batch_ratio=0.05,repeat=10)
+train,test=Data.getPipeLine(p_miss=0.5,p_hints=0.5,train_rate=0.8,batch_ratio=0.2,repeat=1000)
 test=iter(test)
 for dat_train,[mask,hint_mask,hints] in tqdm(train):
     Model2.train_discriminator(dat_train,mask,hints,steps=5)
@@ -49,7 +49,7 @@ for dat_train,[mask,hint_mask,hints] in tqdm(train):
 #%% Run - Step 3
 # Training with discriminator unrolling
 counter=0
-train,test=Data.getPipeLine(p_miss=0.5,p_hints=0.5,train_rate=0.8,batch_ratio=0.05,repeat=10)
+train,test=Data.getPipeLine(p_miss=0.5,p_hints=0.5,train_rate=0.8,batch_ratio=0.2,repeat=10)
 test=iter(test)
 Discriminator.intiateUnrolling(Data.Dim)
 for dat_train,[mask,hint_mask,hints] in tqdm(train):

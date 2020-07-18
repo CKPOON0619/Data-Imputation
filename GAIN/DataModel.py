@@ -2,6 +2,19 @@ import tensorflow as tf
 import numpy as np
 
 #%% Helpers
+def createTestMaskNHints(data):
+    '''
+    Produce a test mask for the distribution of the last column.
+
+    Args:
+        data: Input data.
+    Returns:
+        An array of test mask with 0 at the last entries of each row and 1 in the rest of the entries.
+    '''
+    shape=tf.shape(data)
+    testMask=tf.tile(tf.concat([tf.ones([1,shape[1]-1],dtype=tf.float32),tf.zeros([1,1],dtype=tf.float32)],axis=1),[shape[0],1])
+    return testMask
+
 # Normalization (0 to 1)
 def createNormaliser(dataRange):
     '''
@@ -52,7 +65,11 @@ def createMaskNHints(data,maskRatio,hintRate):
     hint_mask,hints=createHint(mask,hintRate)
     return mask,hint_mask,hints
     
+def createHints(mask,hintRate):
+    hint_mask,hints=createHint(mask,hintRate)
+    return hint_mask,hints
     
+
     
 #%% Data Model
 class DataModel():
@@ -62,7 +79,7 @@ class DataModel():
     Args:
         data_path: A path to a comma delimited csv file with data header.
     """
-    def __init__(self,data_path,rangeBoost=2):
+    def __init__(self,data_path,rangeBoost=0):
         self.data_path=data_path
         self.rawData=tf.convert_to_tensor(np.genfromtxt(self.data_path, delimiter=",",skip_header=1),dtype=tf.float32)
         [self.sample_size,self.Dim]=tf.shape(self.rawData).numpy()
@@ -70,8 +87,8 @@ class DataModel():
         currentMin=tf.math.reduce_min(self.rawData,axis=0)
         
         # Increase data range TODO: review how this should work
-        dataMax=currentMax+rangeBoost*(currentMax-currentMin) # max + 2*(max-min)
-        dataMin=currentMin-rangeBoost*(currentMax-currentMin) # min - 2*(max-min)
+        dataMax=currentMax+rangeBoost*(currentMax-currentMin) # max + boost*(max-min)
+        dataMin=currentMin-rangeBoost*(currentMax-currentMin) # min - boost*(max-min)
         self.range=[dataMin,dataMax]
         self.normaliser=createNormaliser(self.range)
         self.denormaliser=createDenormaliser(self.range)

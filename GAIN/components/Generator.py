@@ -19,49 +19,6 @@ class myGenerator(tf.Module):
     def load(self,path):
         self.body=tf.keras.models.load_model(path)
 
-    
-    def train_with_critic(self,data_batch,mask,hints,criticise_fn,optimizer,alpha=1):
-        '''
-        The training the generator.
-
-        Args:
-            data_batch: training data.
-            mask: a matrix with the same size as discriminated_probs. Entry value 1 indicate a genuine value, value 0 indicate missing(generated) value.
-            hints: hints matrix for the discriminator. 1 = genuine, 0 = generated, 0.5 = unknown
-            loss_fn: loss function that evaluate the loss value of generated values with input signature (x,generated_x,mask,hints,alpha).
-            optimizer: optimizer used for training the discriminator.
-        Returns:
-            discriminator_loss: loss value for discriminator.
-        '''
-        with tf.GradientTape(persistent=True) as tape:
-            generated_data=self.generate(data_batch,mask)
-            adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
-            critics=criticise_fn(adjusted_generated_data,hints)
-            critic_loss=-tf.reduce_mean(critics)      
-        loss_gradients = tape.gradient(critic_loss,self.trainable_variables)
-        optimizer.apply_gradients(zip(loss_gradients, self.trainable_variables))
-        return critic_loss
-    
-
-    def performance_log_with_critic(self,writer,prefix,data_batch,mask,hints,hint_mask,criticise_fn,epoch):  
-        '''
-        To be filled.
-        '''    
-        generatedLastCol=self.generate(data_batch,get_test_mask(data_batch))
-        generated_data=self.generate(data_batch,mask)
-        adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
-        generated_critics_mean=tf.reduce_mean(criticise_fn(adjusted_generated_data,hints))
-        genuine_critics_mean=tf.reduce_mean(criticise_fn(data_batch,hints))
-        critic_loss=generated_critics_mean-genuine_critics_mean
-        with writer.as_default():
-            tf.summary.scalar(prefix+' know value regeneration error', get_total_generator_truth_error(data_batch,generated_data,mask), step=epoch)
-            tf.summary.scalar(prefix+' critic_loss', critic_loss, step=epoch)
-            tf.summary.scalar(prefix+' genuine_critics_mean',genuine_critics_mean, step=epoch) 
-            tf.summary.scalar(prefix+' generated_critics_mean',generated_critics_mean, step=epoch) 
-            tf.summary.histogram(prefix+' hidden value generation errors',get_generated_value_errors(mask,hint_mask,data_batch,generated_data), step=epoch) 
-            tf.summary.histogram(prefix+' generated last column distribution',get_last_column(generatedLastCol), step=epoch) 
-            tf.summary.histogram(prefix+' actual last column distribution',get_last_column(data_batch), step=epoch) 
-
     def generate(self,x,mask):
         """
         Generator model call for GAIN which is a residual block with a dense sequential body.
