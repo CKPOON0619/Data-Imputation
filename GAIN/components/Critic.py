@@ -55,20 +55,22 @@ class myCritic(Module):
     def load(self,path):
         self.body=tf.keras.models.load_model(path)
         
-    def performance_log(self,writer,prefix,data_batch,adjusted_generated_data,mask,hints,alpha,epoch):
+    def performance_log(self,writer,prefix,data_batch,adjusted_generated_data,mask,hint_mask,hints,alpha,missRate,epoch):
         '''
         To be filled.
         '''    
         tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
         interpolated_data=tau*adjusted_generated_data+(1-tau)*data_batch
         generated_critics=self.criticise(adjusted_generated_data,hints)
-        genuine_critics=self.criticise(data_batch,hints)
-        mean_critics_diff=tf.reduce_mean(generated_critics)-tf.reduce_mean(genuine_critics)
+        
+        generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(1-hint_mask)))
+        generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(1-hint_mask)))
+        mean_critics_diff=self.calc_critic_diff_ind(data_batch,adjusted_generated_data,mask,hints,missRate)
         penalty_regulation=self.calc_critic_penalty(interpolated_data,hints)
-        critic_loss=-mean_critics_diff-alpha*penalty_regulation
+        critic_loss=mean_critics_diff+alpha*penalty_regulation
         with writer.as_default():
-            tf.summary.histogram(prefix+' generated_critics',generated_critics, step=epoch) 
-            tf.summary.histogram(prefix+' genuine_critics',genuine_critics, step=epoch) 
+            tf.summary.histogram(prefix+' generated_fake_critics',generated_fake_critics, step=epoch) 
+            tf.summary.histogram(prefix+' generated_genuine_critics',generated_genuine_critics, step=epoch) 
             tf.summary.scalar(prefix+' mean_critics_diff',mean_critics_diff, step=epoch) 
             tf.summary.scalar(prefix+' penalty_regulation',penalty_regulation, step=epoch) 
             tf.summary.scalar(prefix+' critic_loss',critic_loss, step=epoch) 
@@ -133,7 +135,7 @@ class myCritic(Module):
             with tf.GradientTape(persistent=True) as tape:
                 generated_critics=self.call_episode(i,adjusted_generated_x,hints)
                 genuine_critics=self.criticise(data_batch,hints)
-                mean_critic_diff=tf.reduce_mean(tf.abs(generated_critics-genuine_critics))
+                mean_critic_diff=tf.reduce_mean(generated_critics-genuine_critics)
                 with tf.GradientTape() as tape2:           
                     interpolated_critics=tf.reduce_sum(self.call_episode(self.episode_num-1,interpolated_data,hints),axis=1)
                 interpolated_critic_gradients = tape2.jacobian(interpolated_critics,self.body.trainable_variables)
@@ -141,7 +143,7 @@ class myCritic(Module):
                 for interpolated_critic_gradient in interpolated_critic_gradients:
                     gradients_square_sum=gradients_square_sum+tf.reduce_sum(tf.square(interpolated_critic_gradient),axis=[-1,1])
                 penalty_regulation=tf.reduce_mean(tf.square(tf.math.sqrt(gradients_square_sum)-1))                    
-            critic_loss=-mean_critic_diff-alpha*penalty_regulation
+            critic_loss=mean_critic_diff+alpha*penalty_regulation
             critic_loss_gradients = tape.gradient(critic_loss,self.episodes[self.episode_num-1].trainable_variables)
             optimizer.apply_gradients(zip(critic_loss_gradients,self.episodes[self.episode_num-1].trainable_variables))
                 
@@ -150,7 +152,12 @@ class myCritic(Module):
         genuine_critics=self.criticise(data_batch,hints)
         mean_critics_diff=tf.reduce_mean(generated_critics)-tf.reduce_mean(genuine_critics)
         return mean_critics_diff
-       
+    
+    def calc_critic_diff_ind(self,data_batch,adjusted_generated_data,mask,hints,missRate):
+        generated_critics=self.criticise(adjusted_generated_data,hints)
+        mean_critic_differences=tf.reduce_mean(generated_critics*(1-mask),axis=0)*(1-missRate)/missRate-tf.reduce_mean(generated_critics*mask,axis=0)
+        return tf.reduce_sum(mean_critic_differences)
+    
     def calc_critic_penalty(self,interpolated_data,hints):
         with tf.GradientTape(watch_accessed_variables=False, persistent=True) as tape:
             tape.watch(interpolated_data)           
@@ -160,7 +167,7 @@ class myCritic(Module):
         gradient_penalty = tf.reduce_mean(tf.square(normed_gradients-1.))
         return gradient_penalty
               
-    def train(self,data_batch,adjusted_generated_data,mask,hints,alpha,optimizer):
+    def train(self,data_batch,adjusted_generated_data,mask,hints,alpha,missRate,optimizer):
         '''
         The training the discriminator.
 
@@ -178,11 +185,9 @@ class myCritic(Module):
         tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
         interpolated_data=data_batch+tau*(adjusted_generated_data-data_batch)
         with tf.GradientTape() as tape:
-            mean_critics_diff=self.calc_critic_diff(data_batch,adjusted_generated_data,hints)
+            mean_critics_diff=self.calc_critic_diff_ind(data_batch,adjusted_generated_data,mask,hints,missRate)
             gradient_penalty=self.calc_critic_penalty(interpolated_data,hints)
             critic_loss=mean_critics_diff+alpha*gradient_penalty
-        self.gradient_penalty=gradient_penalty
-        self.mean_critics_diff=mean_critics_diff
         critic_loss_gradient = tape.gradient(critic_loss,self.body.trainable_variables)
         optimizer.apply_gradients(zip(critic_loss_gradient, self.body.trainable_variables))
         return critic_loss
@@ -201,4 +206,4 @@ class myCritic(Module):
         Returns:
             Output of the generated by the generator.
         """
-        return tf.reduce_sum(self.body(tf.concat(axis = 1, values = [data,hints])),axis=1)
+        return self.body(tf.concat(axis = 1, values = [data,hints]))
