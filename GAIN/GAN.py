@@ -36,6 +36,11 @@ def get_test_mask(x):
     shape=tf.shape(x)
     testMask=tf.tile(tf.concat([tf.ones([1,shape[1]-1],dtype=tf.float32),tf.zeros([1,1],dtype=tf.float32)],axis=1),[shape[0],1])
     return testMask
+
+def get_last_column_scanner(x):
+    shape=tf.shape(x)
+    return tf.concat([tf.zeros(shape=[shape[0],shape[1]-1],dtype=tf.float32),tf.reshape(tf.range(0,1,1/shape[0],dtype=tf.float32),shape=[shape[0],1])],axis=1)
+    
 def get_last_column(x):
     '''
     Collect the last column of matrx x.
@@ -100,25 +105,40 @@ class GAN(Orchestrator):
     def tensorboard_log(self,prefix,data_batch,mask,hints,hint_mask):
         generated_data=self.generator.generate(data_batch,mask)
         adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+        
         self.discriminator.performance_log(self.summary_writer,prefix,adjusted_generated_data,hints,mask,hint_mask,self.p_miss,self.epoch)
         
-        generatedLastCol=self.generator.generate(data_batch,get_test_mask(data_batch))
+        lastColMask=get_test_mask(data_batch)
+        lastColHints=lastColMask+(1-lastColMask)*0.5
+        lastColMasked_sample=lastColMask*data_batch+(1-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
+        generatedLastCol=self.discriminator.body(tf.concat(axis = 1, values = [lastColMasked_sample,lastColMask]))
+        randomLastColDiscriminations=self.discriminator.discriminate(lastColMasked_sample,lastColHints)
+        
         discriminated_probs=self.discriminator.discriminate(adjusted_generated_data,hints)
         generator_loss=get_generator_logLoss(discriminated_probs,mask)
         with self.summary_writer.as_default():
             tf.summary.scalar(prefix+' generator_loss', generator_loss, step=self.epoch) 
             tf.summary.scalar(prefix+' know value regeneration error', get_total_generator_truth_error(data_batch,generated_data,mask), step=self.epoch)
             tf.summary.histogram(prefix+' hidden value generation errors',get_generated_value_errors(mask,hint_mask,data_batch,generated_data), step=self.epoch) 
+           
+            tf.summary.histogram(prefix+' discrimination distribution of uniformly random last column',get_last_column(randomLastColDiscriminations), step=self.epoch) 
             tf.summary.histogram(prefix+' generated last column distribution',get_last_column(generatedLastCol), step=self.epoch) 
             tf.summary.histogram(prefix+' actual last column distribution',get_last_column(data_batch), step=self.epoch) 
-
-        
         self.epoch.assign_add(1)
         
     def tensorboard_log_with_random(self,prefix,data_batch,mask,hints,hint_mask):
         generated_data=generate_random(data_batch,mask)
         adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+        
+        lastColMask=get_test_mask(data_batch)
+        lastColHints=lastColMask+(1-lastColMask)*0.5
+        lastColMasked_sample=lastColMask*data_batch+(1-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
+        randomLastColDiscriminations=self.discriminator.discriminate(lastColMasked_sample,lastColHints)
+        
         self.discriminator.performance_log(self.summary_writer,prefix,adjusted_generated_data,hints,mask,hint_mask,self.p_miss,self.epoch)
+        with self.summary_writer.as_default():
+            tf.summary.histogram(prefix+' discrimination distribution of uniformly random last column',get_last_column(randomLastColDiscriminations), step=self.epoch) 
+        
         self.epoch.assign_add(1)
 
     @tf.function
