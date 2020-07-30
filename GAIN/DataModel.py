@@ -45,7 +45,24 @@ def createMask(data,maskRatio):
     Returns: 
         0,1 matrix of the same shape as data
     '''
+    print(tf.shape(data))
     return tf.dtypes.cast((tf.random.uniform(tf.shape(data),minval=0,maxval=1)>(1-maskRatio)),dtype=tf.float32)
+
+def create_random_mask(data,fixed_mask,maskRatio):
+    '''
+    Args:
+        data: tensor to be masked
+        mask: mask showing entries to be revealed. 1: revealed, 0: reveal according to maskRatio Rate.
+        maskRatio: proportion of entries to be marked as 1
+    Returns: 
+        0,1 matrix of the same shape as data
+    '''
+    [sample_size,dim]=tf.shape(data)
+    full_random_mask=tf.dtypes.cast((tf.random.uniform(tf.shape(data),minval=0,maxval=1)>(1-maskRatio)),dtype=tf.float32)
+    return tf.tile([fixed_mask],[sample_size,1])+full_random_mask*(1-fixed_mask)
+    
+   
+
 
 def createHint(mask,hintRate):
     '''
@@ -59,11 +76,6 @@ def createHint(mask,hintRate):
     hint_mask=createMask(mask,1-hintRate)
     hints=hint_mask*mask+(1-hint_mask)*0.5
     return hint_mask,hints
-
-def createMaskNHints(data,maskRatio,hintRate):
-    mask=createMask(data,maskRatio)
-    hint_mask,hints=createHint(mask,hintRate)
-    return mask,hint_mask,hints
     
 def createHints(mask,hintRate):
     hint_mask,hints=createHint(mask,hintRate)
@@ -93,8 +105,10 @@ class DataModel():
         self.normaliser=createNormaliser(self.range)
         self.denormaliser=createDenormaliser(self.range)
 
+        
+
     # Setting up data pipeline
-    def getPipeLine(self,train_rate,batch_ratio,repeat,p_miss=0.5,p_hints=0.5):
+    def getPipeLine(self,train_rate,batch_ratio,repeat,fix_mask=None,p_miss=0.5,p_hints=0.5):
         """
         This function create and return a tensorflow data object with provided arguments.
 
@@ -106,17 +120,40 @@ class DataModel():
         Returns:
             A tensorflow dataset object zipped with train and test data.
         """
+        if fix_mask is not None:
+            self.fix_masks=tf.tile([fix_mask],[self.sample_size,1])
+        else:
+            self.fix_masks=tf.zeros([self.sample_size,self.Dim])
+            
+        full_random_masks=tf.dtypes.cast((tf.random.uniform([self.sample_size,self.Dim],minval=0,maxval=1)>(1-p_miss)),dtype=tf.float32)
+        full_random_hints_masks=tf.dtypes.cast((tf.random.uniform([self.sample_size,self.Dim],minval=0,maxval=1)>(1-p_hints)),dtype=tf.float32)
+        
         train_size=int(self.sample_size*train_rate)
         train_batch=int(train_size*batch_ratio)
         self.train_batch_size=int(train_batch)
-        dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size).map(lambda x: [x,createMaskNHints(x,p_miss,p_hints)])
-        dataset_train=dataset.take(train_size).batch(train_batch,drop_remainder=True).repeat(repeat)
-       
+
+        masks=(1-self.fix_masks)*full_random_masks+self.fix_masks
+        hint_masks=(1-self.fix_masks)*full_random_hints_masks+self.fix_masks
+        hints=(1-hint_masks)*0.5+hint_masks*masks
+        
+        masks_set=tf.data.Dataset.from_tensor_slices(masks)
+        hint_masks_set=tf.data.Dataset.from_tensor_slices(hint_masks)
+        hints_set=tf.data.Dataset.from_tensor_slices(hints)
+        masks_and_hints=tf.data.Dataset.zip((masks_set,hint_masks_set,hints_set))
+        
+        masks_and_hints=masks_and_hints.shuffle(buffer_size=self.sample_size)
+        dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size)
+        
+        dataset_with_masks_and_hints=tf.data.Dataset.zip((dataset,masks_and_hints))       
+        dataset_train=dataset_with_masks_and_hints.take(train_size).batch(train_batch,drop_remainder=True).repeat(repeat)
+
         if train_rate!=1:
             test_size=self.sample_size-train_size
             test_batch=int(test_size*batch_ratio)
-            dataset_test=dataset.skip(train_size).batch(test_batch,drop_remainder=True).repeat(int(repeat*train_rate/(1-train_rate)))
+            dataset_test=dataset_with_masks_and_hints.skip(train_size).batch(test_batch,drop_remainder=True).repeat(int(repeat*train_rate/(1-train_rate)))
             return dataset_train,dataset_test
+        
+        
         
         return dataset_train,None
 
