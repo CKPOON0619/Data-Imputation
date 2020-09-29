@@ -7,6 +7,7 @@ from datetime import datetime
 from os import getcwd
 from components.Orchestrator import Orchestrator
 from components.Critic import myCritic
+import matplotlib.pyplot as plt
 
 def generate_random(data_batch,mask):
     random_generated=tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
@@ -84,7 +85,7 @@ class WGAN(Orchestrator):
         self.episode_num=5
         super().__init__(summary_writer=summary_writer, hyperParams=hyperParams, optimizer=optimizer)
 
-    def tensorboard_log(self,prefix,data_batch,mask,hints,hint_mask):
+    def tensorboard_log(self,prefix,data_batch,fix_mask,mask,hints,hint_mask):
         tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
         
         generated_data=self.generator.generate(data_batch,mask)
@@ -106,7 +107,7 @@ class WGAN(Orchestrator):
         hinted_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(hint_mask)))
         generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)))
         
-        mean_critics_diff=self.critic.calc_critic_diff_ind(data_batch,adjusted_generated_data,mask,hints,self.p_miss)
+        mean_critics_diff=self.critic.calc_critic_diff_ind(data_batch,adjusted_generated_data,fix_mask,mask,hints,self.p_miss)
         penalty_regulation=self.critic.calc_critic_penalty(interpolated_data,hints)
         critic_loss=mean_critics_diff+self.alpha*penalty_regulation
         
@@ -126,9 +127,23 @@ class WGAN(Orchestrator):
             tf.summary.histogram(prefix+' actual last column distribution',get_last_column(data_batch), step=self.epoch) 
             self.summary_writer.flush() 
         self.epoch.assign_add(1)
+        
+    def critic_scan(self,data_batch):
+        lastColMask=get_test_mask(data_batch)
+        lastColHints=lastColMask+(1-lastColMask)*0.5
+        
+        rangeScan=tf.reshape(tf.range(0,1,1/tf.shape(data_batch)[0]+1e-12,dtype=tf.float32),[tf.shape(data_batch)[0],1])
+        zeros=tf.zeros(shape=[tf.shape(data_batch)[0],tf.shape(data_batch)[1]-1],dtype=tf.float32)    
+        scanner=tf.concat([zeros,rangeScan],axis=1)
+        
+        lastColScanner=lastColMask*data_batch+scanner
+        scannedLastColCritics=self.critic.criticise(lastColScanner,lastColHints)
+        plt.plot(scannedLastColCritics.numpy()[:,-1])
+        # np.histogram(data_batch[:,5].numpy())
+        return lastColScanner,scannedLastColCritics
     
     @tf.function
-    def tensorboard_log_with_random(self,prefix,data_batch,mask,hints,hint_mask):
+    def tensorboard_log_with_random(self,prefix,data_batch,fix_mask,mask,hints,hint_mask):
         tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
         
         generated_data=generate_random(data_batch,mask)
@@ -148,7 +163,7 @@ class WGAN(Orchestrator):
         blinded_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(1-hint_mask)))
         hinted_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(hint_mask)))
         generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)))
-        mean_critics_diff=self.critic.calc_critic_diff_ind(data_batch,adjusted_generated_data,mask,hints,self.p_miss)
+        mean_critics_diff=self.critic.calc_critic_diff_ind(data_batch,adjusted_generated_data,fix_mask,mask,hints,self.p_miss)
         penalty_regulation=self.critic.calc_critic_penalty(interpolated_data,hints)
         critic_loss=mean_critics_diff+self.alpha*penalty_regulation
         
@@ -170,21 +185,22 @@ class WGAN(Orchestrator):
         return critic_loss
         
 
-    def train_critic_with_random(self,data_batch,mask,hints):
+    def train_critic_with_random(self,data_batch,fix_mask,mask,hints):
         '''
         A function that train critic with randomly generated data.
         Args:
             data_batch: data input.
+            fix_mask: constant mask for all data.
             mask: mask of the data, 0,1 matrix of the same shape as data.
             hints: hints matrix with 1,0.5,0 values. Same shape as data.
             steps: The number of steps training the critic each time before training the generator.
         '''
         generated_data=generate_random(data_batch,mask)
         adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
-        self.critic.train(data_batch,adjusted_generated_data,mask,hints,self.alpha,self.p_miss,self.optimizer)
+        self.critic.train(data_batch,adjusted_generated_data,fix_mask,mask,hints,self.alpha,self.p_miss,self.optimizer)
 
     @tf.function
-    def train_critic(self,data_batch,mask,hints,steps=1):
+    def train_critic(self,data_batch,fix_mask,mask,hints,steps=1):
         '''
         A function that train generator and respective discriminator.
         Args:
@@ -198,7 +214,7 @@ class WGAN(Orchestrator):
         for i in range(0,steps):
             generated_data=self.generator.generate(data_batch,mask)
             adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
-            self.critic.train(data_batch,adjusted_generated_data,mask,hints,self.alpha,self.p_miss,self.optimizer)
+            self.critic.train(data_batch,adjusted_generated_data,fix_mask,mask,hints,self.alpha,self.p_miss,self.optimizer)
         
     @tf.function
     def train_generator(self,data_batch,mask,hints):

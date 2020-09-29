@@ -32,5 +32,5 @@ class myGenerator(tf.Module):
         """
         masked_x=mask*x
         masked_sample=(1-mask)*tf.random.uniform(tf.shape(x),minval=0,maxval=1,dtype=tf.float32)
-        return self.body(tf.concat(axis = 1, values = [masked_x+masked_sample,mask]))
+        return self.body([masked_x+masked_sample,mask])
 

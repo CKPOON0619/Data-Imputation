@@ -7,6 +7,7 @@ from datetime import datetime
 from os import getcwd
 from components.Orchestrator import Orchestrator
 from components.Discriminator import myDiscriminator
+import matplotlib.pyplot as plt
 #%%
 def generate_random(data_batch,mask):
     random_generated=tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
@@ -182,7 +183,19 @@ class GAN(Orchestrator):
         loss_gradients = tape.gradient(total_loss,self.generator.body.trainable_variables)
         self.optimizer.apply_gradients(zip(loss_gradients, self.generator.body.trainable_variables))
 
-
+    def discriminator_scan(self,data_batch):
+        lastColMask=get_test_mask(data_batch)
+        lastColHints=lastColMask+(1-lastColMask)*0.5
+        
+        rangeScan=tf.reshape(tf.range(0,1,1/tf.shape(data_batch)[0]+1e-12,dtype=tf.float32),[tf.shape(data_batch)[0],1])
+        zeros=tf.zeros(shape=[tf.shape(data_batch)[0],tf.shape(data_batch)[1]-1],dtype=tf.float32)    
+        scanner=tf.concat([zeros,rangeScan],axis=1)
+        
+        lastColScanner=lastColMask*data_batch+scanner
+        scannedLastColCritics=self.discriminator.discriminate(lastColScanner,lastColHints)
+        plt.plot(scannedLastColCritics.numpy()[:,-1])
+        # np.histogram(data_batch[:,5].numpy())
+        return lastColScanner,scannedLastColCritics
     
     @tf.function
     def train_discriminator_with_random(self,data_batch,mask,hints):

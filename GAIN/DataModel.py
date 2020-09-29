@@ -136,11 +136,12 @@ class DataModel():
         hint_masks=(1-self.fix_masks)*full_random_hints_masks+self.fix_masks
         hints=(1-hint_masks)*0.5+hint_masks*masks
         
+        fix_mask_set=tf.data.Dataset.from_tensor_slices(self.fix_masks)
         masks_set=tf.data.Dataset.from_tensor_slices(masks)
         hint_masks_set=tf.data.Dataset.from_tensor_slices(hint_masks)
         hints_set=tf.data.Dataset.from_tensor_slices(hints)
-        masks_and_hints=tf.data.Dataset.zip((masks_set,hint_masks_set,hints_set))
         
+        masks_and_hints=tf.data.Dataset.zip((fix_mask_set,masks_set,hint_masks_set,hints_set))
         masks_and_hints=masks_and_hints.shuffle(buffer_size=self.sample_size)
         dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size)
         
