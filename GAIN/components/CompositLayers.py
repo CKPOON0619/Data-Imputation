@@ -2,7 +2,7 @@
 # Create generator/discriminator bodies
 import tensorflow as tf
 
-def compositLayers(layer_sizes,dropout_rate=0.2,output_activation=tf.nn.sigmoid):
+def compositLayers(layer_sizes,dropout_rate=0.2,batch_normalised=True,output_activation=tf.nn.sigmoid):
     layers = []
     for idx in range(len(layer_sizes)-2):
         layers+=[tf.keras.layers.Dense(layer_sizes[idx], kernel_initializer="glorot_normal"),tf.keras.layers.LeakyReLU()]

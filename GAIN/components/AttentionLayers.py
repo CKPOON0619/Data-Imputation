@@ -44,6 +44,7 @@ def scaled_dot_product_attention(q, k, v, mask):
 
 # %%
 class MultiHeadAttention(tf.keras.layers.Layer):
+
     '''
         Ref:https://www.tensorflow.org/tutorials/text/transformer#multi-head_attention
         parameters:
@@ -126,13 +127,14 @@ def point_wise_feed_forward_network(d_model, dff):
   ])
       
 #%%
-class ModuleLayer(tf.keras.layers.Layer):
+class AttentionLayer(tf.keras.layers.Layer):
     """
         Ref:https://www.tensorflow.org/tutorials/text/transformer#multi-head_attention
     """
-    def __init__(self, d_model, num_heads, dff,training=True, rate=0.1):
-        super(ModuleLayer, self).__init__()
+    def __init__(self, d_model, num_heads, dff,training=True, rate=0):
+        super(AttentionLayer, self).__init__()
         self.training=True
+        self.rate=rate
 
         self.mha = MultiHeadAttention(d_model, num_heads)
         self.ffn = point_wise_feed_forward_network(d_model, dff)
@@ -140,8 +142,9 @@ class ModuleLayer(tf.keras.layers.Layer):
         self.layernorm1 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
         self.layernorm2 = tf.keras.layers.LayerNormalization(epsilon=1e-6)
         
-        self.dropout1 = tf.keras.layers.Dropout(rate)
-        self.dropout2 = tf.keras.layers.Dropout(rate)
+        if rate>0:
+            self.dropout1 = tf.keras.layers.Dropout(rate)
+            self.dropout2 = tf.keras.layers.Dropout(rate)
         
     def set(self,params):
         self.__dict__.update(params)
@@ -150,24 +153,27 @@ class ModuleLayer(tf.keras.layers.Layer):
     def call(self, x, mask_mha=None):
         # x = (batch_size, input_seq_len, d_model)
         attn_output, _ = self.mha(x, x, x, mask_mha)  # (batch_size, input_seq_len, d_model)
-        attn_output = self.dropout1(attn_output, training=self.training)
-        out1 = self.layernorm1(x + attn_output)  # (batch_size, input_seq_len, d_model), x must have the same dim as attn_output
-        
+        if self.rate>0:
+            attn_output = self.dropout1(attn_output, training=self.training)
+        # out1 = self.layernorm1(x + attn_output)  # (batch_size, input_seq_len, d_model), x must have the same dim as attn_output
+        out1=x+attn_output
         ffn_output = self.ffn(out1)  # (batch_size, input_seq_len, d_model)
-        ffn_output = self.dropout2(ffn_output, training=self.training)
-        out2 = self.layernorm2(out1 + ffn_output)  # (batch_size, input_seq_len, d_model)
-        
+        if self.rate>0:
+            ffn_output = self.dropout2(ffn_output, training=self.training)
+        # out2 = self.layernorm2(out1 + ffn_output)  # (batch_size, input_seq_len, d_model)
+        out2=out1+ffn_output
         return out2
     
-class CompositeLayers(tf.keras.layers.Layer):
+class CompositeAttentionLayers(tf.keras.layers.Layer):
     """
         Ref:https://www.tensorflow.org/tutorials/text/transformer#multi-head_attention
     """
-    def __init__(self, layer_num, d_model, num_heads, dff,activation="sigmoid",training=True, rate=0.1):
-        super(CompositeLayers, self).__init__()
+    def __init__(self, layer_num, d_attention, num_heads, dff,activation="sigmoid",training=True, rate=0):
+        super(CompositeAttentionLayers, self).__init__()
+        d_model=d_attention*num_heads
         self.training=True
         self.inputLayer=tf.keras.layers.Dense(d_model)
-        self.modules = [ModuleLayer(d_model, num_heads, dff,training, rate) for i in range(layer_num)]
+        self.modules = [AttentionLayer(d_model, num_heads, dff,training, rate) for i in range(layer_num)]
         self.outputLayer=tf.keras.layers.Dense(1,activation=activation)
         
     def setModules(self,params):
@@ -182,3 +188,7 @@ class CompositeLayers(tf.keras.layers.Layer):
         shape=tf.shape(y)
         return tf.reshape(y,(shape[0],-1))
 
+
+# %%
+
+# %%

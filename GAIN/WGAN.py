@@ -185,6 +185,7 @@ class WGAN(Orchestrator):
         return critic_loss
         
 
+    @tf.function
     def train_critic_with_random(self,data_batch,fix_mask,mask,hints):
         '''
         A function that train critic with randomly generated data.
