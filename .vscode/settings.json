@@ -2,5 +2,6 @@
     "python.linting.pylintEnabled": true,
     "python.linting.enabled": true,
     "python.linting.pylamaEnabled": false,
-    "python.linting.banditEnabled": false
+    "python.linting.banditEnabled": false,
+    "python.pythonPath": "C:\\Users\\CK\\Anaconda3\\envs\\TF\\python.exe"
 }

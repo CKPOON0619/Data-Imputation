@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 #%%
 def generate_random(data_batch,mask):
     random_generated=tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
-    return random_generated*(1-mask)+data_batch*mask
+    return random_generated*(1.-mask)+data_batch*mask
 def get_generator_logLoss(discriminations,mask):
     '''
     Get the logLoss contributed for generated fake values.
@@ -24,7 +24,7 @@ def get_generator_logLoss(discriminations,mask):
     
     '''
     ## Likelinhood loss caused by discriminable values
-    return -tf.reduce_sum((1-mask) * tf.math.log(discriminations + 1e-8))/tf.reduce_sum(1-mask)
+    return -tf.reduce_sum((1.-mask) * tf.math.log(discriminations + 1e-8))/tf.reduce_sum(1.-mask)
 def get_test_mask(x):
     '''
     Produce a test mask for the distribution of the last column.
@@ -65,7 +65,7 @@ def get_generated_value_errors(mask,hint_mask,x,generated_x):
         values of the generated values that are unknown to the generator.
     '''
     ## Check the difference between generated value and actual value
-    return tf.gather_nd((generated_x-x),tf.where((1-mask)*(1-hint_mask)))
+    return tf.gather_nd((generated_x-x),tf.where((1.-mask)*(1.-hint_mask)))
 
 def get_total_generator_truth_error(data_batch,generated_data,mask):
     '''
@@ -105,13 +105,13 @@ class GAN(Orchestrator):
     @tf.function
     def tensorboard_log(self,prefix,data_batch,mask,hints,hint_mask):
         generated_data=self.generator.generate(data_batch,mask)
-        adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+        adjusted_generated_data=mask*data_batch+generated_data*(1.-mask)
         
         self.discriminator.performance_log(self.summary_writer,prefix,adjusted_generated_data,hints,mask,hint_mask,self.p_miss,self.epoch)
         
         lastColMask=get_test_mask(data_batch)
-        lastColHints=lastColMask+(1-lastColMask)*0.5
-        lastColMasked_sample=lastColMask*data_batch+(1-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
+        lastColHints=lastColMask+(1.-lastColMask)*0.5
+        lastColMasked_sample=lastColMask*data_batch+(1.-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
         generatedLastCol=self.discriminator.body(tf.concat(axis = 1, values = [lastColMasked_sample,lastColMask]))
         randomLastColDiscriminations=self.discriminator.discriminate(lastColMasked_sample,lastColHints)
         
@@ -129,11 +129,11 @@ class GAN(Orchestrator):
         
     def tensorboard_log_with_random(self,prefix,data_batch,mask,hints,hint_mask):
         generated_data=generate_random(data_batch,mask)
-        adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+        adjusted_generated_data=mask*data_batch+generated_data*(1.-mask)
         
         lastColMask=get_test_mask(data_batch)
-        lastColHints=lastColMask+(1-lastColMask)*0.5
-        lastColMasked_sample=lastColMask*data_batch+(1-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
+        lastColHints=lastColMask+(1.-lastColMask)*0.5
+        lastColMasked_sample=lastColMask*data_batch+(1.-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
         randomLastColDiscriminations=self.discriminator.discriminate(lastColMasked_sample,lastColHints)
         
         self.discriminator.performance_log(self.summary_writer,prefix,adjusted_generated_data,hints,mask,hint_mask,self.p_miss,self.epoch)
@@ -156,14 +156,14 @@ class GAN(Orchestrator):
         '''
         for i in range(0,steps):
             generated_data=self.generator.generate(data_batch,mask)
-            adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+            adjusted_generated_data=mask*data_batch+generated_data*(1.-mask)
             self.discriminator.train(adjusted_generated_data,mask,hints,self.p_miss,self.optimizer)
        
     @tf.function 
     def train_generator(self,data_batch,mask,hints):
         with tf.GradientTape(persistent=True) as tape:
             generated_data=self.generator.generate(data_batch,mask)
-            adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
+            adjusted_generated_data=generated_data*(1.-mask)+mask*data_batch
             discriminations=self.discriminator.discriminate(adjusted_generated_data,hints)
             loss=get_generator_logLoss(discriminations,mask)   
         loss_gradients = tape.gradient(loss,self.generator.body.trainable_variables)
@@ -174,7 +174,7 @@ class GAN(Orchestrator):
     def train_generator_with_discriminator_unrolled(self,data_batch,mask,hints):
         with tf.GradientTape(persistent=True) as tape:
             generated_data=self.generator.generate(data_batch,mask)
-            adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
+            adjusted_generated_data=generated_data*(1.-mask)+mask*data_batch
             discriminations=self.discriminator.discriminate_with_episodes(adjusted_generated_data,hints)
             losses=[]
             for discrimination in discriminations:
@@ -185,7 +185,7 @@ class GAN(Orchestrator):
 
     def discriminator_scan(self,data_batch):
         lastColMask=get_test_mask(data_batch)
-        lastColHints=lastColMask+(1-lastColMask)*0.5
+        lastColHints=lastColMask+(1.-lastColMask)*0.5
         
         rangeScan=tf.reshape(tf.range(0,1,1/tf.shape(data_batch)[0]+1e-12,dtype=tf.float32),[tf.shape(data_batch)[0],1])
         zeros=tf.zeros(shape=[tf.shape(data_batch)[0],tf.shape(data_batch)[1]-1],dtype=tf.float32)    
@@ -208,7 +208,7 @@ class GAN(Orchestrator):
             steps: The number of steps training the discriminator each time before training the generator.
         '''
         generated_data=generate_random(data_batch,mask)
-        adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+        adjusted_generated_data=mask*data_batch+generated_data*(1.-mask)
         self.discriminator.train(adjusted_generated_data,mask,hints,self.p_miss,self.optimizer)
 
     @tf.function

@@ -21,7 +21,7 @@ def getDiscriminatorLoss(discriminated_probs,mask,missRate):
     
     '''
     ## log Likelinhood comparison to ground truth + sample rebalancing
-    discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
+    discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1.-missRate)/missRate*(1.-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
     return discriminator_loss
 
 ## Generator loss:
@@ -37,7 +37,7 @@ def getGeneratorFakeLoss(mask,discriminated_probs):
     
     '''
     ## Likelinhood loss caused by discriminable values
-    return -tf.reduce_mean((1-mask) * tf.math.log(discriminated_probs + 1e-8))
+    return -tf.reduce_mean((1.-mask) * tf.math.log(discriminated_probs + 1e-8))
 
 def getGeneratorTruthLoss(mask,x,generated_x):
     '''
@@ -65,7 +65,7 @@ def getHiddenTruthDiscrimination(mask,hint_mask,discriminated_probs):
         discrimination probabilities of the genuine values that are unknown to the discriminator.
     '''
     ## Check if discriminator correctly predicted real data 
-    return tf.gather_nd(discriminated_probs,tf.where(mask*(1-hint_mask)))
+    return tf.gather_nd(discriminated_probs,tf.where(mask*(1.-hint_mask)))
 
 def getHiddenFakeDiscrimination(mask,hint_mask,discriminated_probs):
     '''
@@ -79,7 +79,7 @@ def getHiddenFakeDiscrimination(mask,hint_mask,discriminated_probs):
         discrimination probabilities of the generated values that are unknown to the discriminator.
     '''
     ## Check if discriminator correctly predicted generated(fake) data 
-    return tf.gather_nd(discriminated_probs,tf.where((1-mask)*(1-hint_mask)))
+    return tf.gather_nd(discriminated_probs,tf.where((1.-mask)*(1.-hint_mask)))
 
 
 def getGeneratorLoss(alpha,discriminated_probs,x,generated_x,mask):
@@ -205,7 +205,7 @@ def run(x,mask,hints,generator,discriminator):
         discriminated_probs: probability deduced by the discriminator to discriminate generated data.
     '''
     generated_x=generator(x,mask)
-    adjusted_generated_x=mask*x+generated_x*(1-mask)
+    adjusted_generated_x=mask*x+generated_x*(1.-mask)
     discriminated_probs=discriminator(adjusted_generated_x,hints)
     return generated_x,discriminated_probs
 
@@ -244,7 +244,7 @@ def calcMultiGeneratorLoss(x,mask,hints,generator,discriminators,alpha):
     
     '''
     generated_x=generator(x,mask)
-    adjusted_generated_x=mask*x+generated_x*(1-mask)
+    adjusted_generated_x=mask*x+generated_x*(1.-mask)
     generator_losses=[]
     for i in range(0,len(discriminators)):
         generator_losses.append(getGeneratorLoss(alpha,discriminators[i](adjusted_generated_x,hints),x,generated_x,mask))
@@ -266,7 +266,7 @@ def trainGeneratorWithDiscriminator(data_batch,mask,hints,generator,discriminato
     
     '''
     generated_x=generator(data_batch,mask)
-    adjusted_generated_x=mask*data_batch+generated_x*(1-mask)
+    adjusted_generated_x=mask*data_batch+generated_x*(1.-mask)
     with tf.GradientTape(persistent=True) as tape:
         total_G_episodes_loss=getGeneratorLoss(alpha,discriminator(adjusted_generated_x,hints),data_batch,generated_x,mask)
     # Learning and update weights

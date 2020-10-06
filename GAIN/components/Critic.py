@@ -31,7 +31,7 @@ def cloneModel(model,MyModel,inputDim):
 
 def discrimination_logLoss(discriminations,hints,mask,missRate):
     ## log Likelinhood comparison to ground truth + sample rebalancing
-    discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminations + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminations + 1e-8))
+    discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminations + 1e-8) + (1.-missRate)/missRate*(1.-mask) * tf.math.log(1. - discriminations + 1e-8))
     return discriminator_loss
     
 
@@ -60,11 +60,11 @@ class myCritic(Module):
         To be filled.
         '''    
         tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
-        interpolated_data=tau*adjusted_generated_data+(1-tau)*data_batch
+        interpolated_data=tau*adjusted_generated_data+(1.-tau)*data_batch
         generated_critics=self.criticise(adjusted_generated_data,hints)
         
-        generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(1-hint_mask)))
-        generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(1-hint_mask)))
+        generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(1.-hint_mask)))
+        generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1.-mask)*(1.-hint_mask)))
         mean_critics_diff=self.calc_critic_diff_ind(data_batch,adjusted_generated_data,mask,hints,missRate)
         penalty_regulation=self.calc_critic_penalty(interpolated_data,hints)
         critic_loss=mean_critics_diff+alpha*penalty_regulation
@@ -155,7 +155,7 @@ class myCritic(Module):
     
     def calc_critic_diff_ind(self,data_batch,adjusted_generated_data,fixed_mask,mask,hints,missRate):
         generated_critics=self.criticise(adjusted_generated_data,hints)
-        mean_critic_differences=tf.reduce_mean(generated_critics*(1-mask),axis=0)*(1-missRate)/missRate-tf.reduce_mean(generated_critics*(mask-fixed_mask),axis=0)
+        mean_critic_differences=tf.reduce_mean(generated_critics*(1.-mask),axis=0)*(1.-missRate)/missRate-tf.reduce_mean(generated_critics*(mask-fixed_mask),axis=0)
         return tf.reduce_sum(mean_critic_differences)
     
     def calc_critic_penalty(self,interpolated_data,hints):
@@ -183,7 +183,7 @@ class myCritic(Module):
             discriminator_loss: loss value for discriminator
         '''
         
-        tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
+        tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.float32, seed=None, name=None)
         interpolated_data=data_batch+tau*(adjusted_generated_data-data_batch)
         with tf.GradientTape() as tape:
             mean_critics_diff=self.calc_critic_diff_ind(data_batch,adjusted_generated_data,fixed_mask,mask,hints,missRate)

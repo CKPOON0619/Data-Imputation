@@ -26,7 +26,7 @@ def createMask(data,maskRatio):
     Returns: 
         0,1 matrix of the same shape as data
     '''
-    return tf.dtypes.cast((tf.random.uniform(tf.shape(data),minval=0,maxval=1)>(1-maskRatio)),dtype=tf.float32)
+    return tf.dtypes.cast((tf.random.uniform(tf.shape(data),minval=0,maxval=1)>(1.-maskRatio)),dtype=tf.float32)
 
 
 #%% Body

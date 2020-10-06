@@ -64,7 +64,7 @@ class DataModel():
         
         dataset=tf.data.Dataset.from_tensor_slices(self.normaliser(self.rawData)).shuffle(buffer_size=self.sample_size)
         dataset_train=dataset.take(self.train_size).batch(self.batch_size,drop_remainder=True).repeat(repeat)
-        dataset_test=dataset.skip(self.train_size).batch(self.batch_size,drop_remainder=True).repeat(int(repeat*train_rate/(1-train_rate)))
+        dataset_test=dataset.skip(self.train_size).batch(self.batch_size,drop_remainder=True).repeat(int(repeat*train_rate/(1.-train_rate)))
         return tf.data.Dataset.zip((dataset_train, dataset_test))
 
     def predict(self,generator,data,mask):
@@ -80,7 +80,7 @@ class DataModel():
             Missing filled data.
         """
         x=self.normaliser(data)
-        return self.denormaliser(generator(x,mask)*(1-mask)+mask*x)
+        return self.denormaliser(generator(x,mask)*(1.-mask)+mask*x)
 
     def discriminate(self,discriminator,data,mask):
         """
@@ -96,6 +96,6 @@ class DataModel():
             the data is genuine but not generated.
             genuine -> 1, generated -> 0.
         """
-        hints=mask+(1-mask)*0.5
+        hints=mask+(1.-mask)*0.5
         x_hat=self.normaliser(data)
         return discriminator(x_hat,hints) 

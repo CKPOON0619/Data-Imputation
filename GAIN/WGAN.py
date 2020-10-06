@@ -11,7 +11,7 @@ import matplotlib.pyplot as plt
 
 def generate_random(data_batch,mask):
     random_generated=tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
-    return random_generated*(1-mask)+data_batch*mask
+    return random_generated*(1.-mask)+data_batch*mask
 def get_test_mask(x):
     '''
     Produce a test mask for the distribution of the last column.
@@ -47,7 +47,7 @@ def get_generated_value_errors(mask,hint_mask,x,generated_x):
         values of the generated values that are unknown to the generator.
     '''
     ## Check the difference between generated value and actual value
-    return tf.gather_nd((generated_x-x),tf.where((1-mask)*(1-hint_mask)))
+    return tf.gather_nd((generated_x-x),tf.where((1.-mask)*(1.-hint_mask)))
 
 def get_total_generator_truth_error(data_batch,generated_data,mask):
     '''
@@ -89,23 +89,23 @@ class WGAN(Orchestrator):
         tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
         
         generated_data=self.generator.generate(data_batch,mask)
-        adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
-        interpolated_data=tau*adjusted_generated_data+(1-tau)*data_batch             
+        adjusted_generated_data=mask*data_batch+generated_data*(1.-mask)
+        interpolated_data=tau*adjusted_generated_data+(1.-tau)*data_batch             
   
         lastColMask=get_test_mask(data_batch)
-        lastColHints=lastColMask+(1-lastColMask)*0.5
-        lastColMasked_sample=lastColMask*data_batch+(1-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
+        lastColHints=lastColMask+(1.-lastColMask)*0.5
+        lastColMasked_sample=lastColMask*data_batch+(1.-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
         generatedLastCol=self.generator.body(tf.concat(axis = 1, values = [lastColMasked_sample,lastColMask]))
         randomLastColCritics=self.critic.criticise(lastColMasked_sample,lastColHints)
         
         generated_critics=self.critic.criticise(adjusted_generated_data,hints)
-        blinded_generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(1-hint_mask)))
+        blinded_generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(1.-hint_mask)))
         hinted_generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(hint_mask)))
         generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask))
         
-        blinded_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(1-hint_mask)))  
-        hinted_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(hint_mask)))
-        generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)))
+        blinded_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1.-mask)*(1.-hint_mask)))  
+        hinted_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1.-mask)*(hint_mask)))
+        generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1.-mask)))
         
         mean_critics_diff=self.critic.calc_critic_diff_ind(data_batch,adjusted_generated_data,fix_mask,mask,hints,self.p_miss)
         penalty_regulation=self.critic.calc_critic_penalty(interpolated_data,hints)
@@ -130,9 +130,9 @@ class WGAN(Orchestrator):
         
     def critic_scan(self,data_batch):
         lastColMask=get_test_mask(data_batch)
-        lastColHints=lastColMask+(1-lastColMask)*0.5
+        lastColHints=lastColMask+(1.-lastColMask)*0.5
         
-        rangeScan=tf.reshape(tf.range(0,1,1/tf.shape(data_batch)[0]+1e-12,dtype=tf.float32),[tf.shape(data_batch)[0],1])
+        rangeScan=tf.reshape(tf.range(0,1,1/tf.shape(data_batch,out_type=tf.float32)[0]+1e-12,dtype=tf.float32),[tf.shape(data_batch)[0],1])
         zeros=tf.zeros(shape=[tf.shape(data_batch)[0],tf.shape(data_batch)[1]-1],dtype=tf.float32)    
         scanner=tf.concat([zeros,rangeScan],axis=1)
         
@@ -147,22 +147,22 @@ class WGAN(Orchestrator):
         tau=tf.random.uniform([tf.shape(data_batch)[0],1], minval=0, maxval=1, dtype=tf.dtypes.float32, seed=None, name=None)
         
         generated_data=generate_random(data_batch,mask)
-        adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
-        interpolated_data=tau*adjusted_generated_data+(1-tau)*data_batch
+        adjusted_generated_data=mask*data_batch+generated_data*(1.-mask)
+        interpolated_data=tau*adjusted_generated_data+(1.-tau)*data_batch
                 
         lastColMask=get_test_mask(data_batch)
-        lastColHints=lastColMask+(1-lastColMask)*0.5
-        lastColMasked_sample=lastColMask*data_batch+(1-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
+        lastColHints=lastColMask+(1.-lastColMask)*0.5
+        lastColMasked_sample=lastColMask*data_batch+(1.-lastColMask)*tf.random.uniform(tf.shape(data_batch),minval=0,maxval=1,dtype=tf.float32)
         randomLastColCritics=self.critic.criticise(lastColMasked_sample,lastColHints)
         
         generated_critics=self.critic.criticise(adjusted_generated_data,hints)
-        blinded_generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(1-hint_mask)))
+        blinded_generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(1.-hint_mask)))
         hinted_generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask*(hint_mask)))
         
         generated_genuine_critics=tf.gather_nd(generated_critics,tf.where(mask))
-        blinded_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(1-hint_mask)))
-        hinted_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)*(hint_mask)))
-        generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1-mask)))
+        blinded_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1.-mask)*(1.-hint_mask)))
+        hinted_generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1.-mask)*(hint_mask)))
+        generated_fake_critics=tf.gather_nd(generated_critics,tf.where((1.-mask)))
         mean_critics_diff=self.critic.calc_critic_diff_ind(data_batch,adjusted_generated_data,fix_mask,mask,hints,self.p_miss)
         penalty_regulation=self.critic.calc_critic_penalty(interpolated_data,hints)
         critic_loss=mean_critics_diff+self.alpha*penalty_regulation
@@ -197,7 +197,7 @@ class WGAN(Orchestrator):
             steps: The number of steps training the critic each time before training the generator.
         '''
         generated_data=generate_random(data_batch,mask)
-        adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+        adjusted_generated_data=mask*data_batch+generated_data*(1.-mask)
         self.critic.train(data_batch,adjusted_generated_data,fix_mask,mask,hints,self.alpha,self.p_miss,self.optimizer)
 
     @tf.function
@@ -214,16 +214,16 @@ class WGAN(Orchestrator):
         '''
         for i in range(0,steps):
             generated_data=self.generator.generate(data_batch,mask)
-            adjusted_generated_data=mask*data_batch+generated_data*(1-mask)
+            adjusted_generated_data=mask*data_batch+generated_data*(1.-mask)
             self.critic.train(data_batch,adjusted_generated_data,fix_mask,mask,hints,self.alpha,self.p_miss,self.optimizer)
         
     @tf.function
     def train_generator(self,data_batch,mask,hints):
         with tf.GradientTape(persistent=True) as tape:
             generated_data=self.generator.generate(data_batch,mask)
-            adjusted_generated_data=generated_data*(1-mask)+mask*data_batch
+            adjusted_generated_data=generated_data*(1.-mask)+mask*data_batch
             generated_critics=self.critic.criticise(adjusted_generated_data,hints)
-            critic_loss=-tf.reduce_mean(generated_critics*(1-mask))
+            critic_loss=-tf.reduce_mean(generated_critics*(1.-mask))
         loss_gradients = tape.gradient(critic_loss,self.critic.body.trainable_variables)
         self.optimizer.apply_gradients(zip(loss_gradients, self.critic.body.trainable_variables))
         return critic_loss

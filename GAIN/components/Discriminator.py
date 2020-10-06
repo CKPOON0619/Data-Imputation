@@ -31,7 +31,7 @@ def cloneModel(model,MyModel,inputDim):
 
 def discrimination_logLoss(discriminations,hints,mask,missRate):
     ## log Likelinhood comparison to ground truth + sample rebalancing
-    discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminations + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminations + 1e-8))
+    discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminations + 1e-8) + (1.-missRate)/missRate*(1.-mask) * tf.math.log(1. - discriminations + 1e-8))
     return discriminator_loss
     
 
@@ -60,9 +60,9 @@ class myDiscriminator(Module):
         To be filled.
         '''    
         discriminated_probs=self.discriminate(adjusted_generated_x,hints)
-        discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
-        truth_loss=tf.gather_nd(discriminated_probs,tf.where(mask*(1-hint_mask)))
-        fake_loss=tf.gather_nd(discriminated_probs,tf.where((1-mask)*(1-hint_mask)))
+        discriminator_loss=-tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1.-missRate)/missRate*(1.-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
+        truth_loss=tf.gather_nd(discriminated_probs,tf.where(mask*(1.-hint_mask)))
+        fake_loss=tf.gather_nd(discriminated_probs,tf.where((1.-mask)*(1.-hint_mask)))
         with writer.as_default():
             tf.summary.scalar(prefix+' discriminator loss',discriminator_loss, step=epoch) 
             tf.summary.histogram(prefix+' hidden truth discrimination',truth_loss, step=epoch) 
@@ -109,14 +109,14 @@ class myDiscriminator(Module):
             for j in range(0,steps):
                 with tf.GradientTape(persistent=True) as tape:
                     discriminated_probs=self.call_episode(i,adjusted_generated_x,hints)
-                    D_loss=tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
+                    D_loss=tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1.-missRate)/missRate*(1.-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
                 D_loss_gradients = tape.gradient(D_loss,self.episodes[i].trainable_variables)
                 optimizer.apply_gradients(zip(D_loss_gradients,self.episodes[i].trainable_variables))
             cloneWeights(self.episodes[i],self.episodes[i+1])
             
         with tf.GradientTape(persistent=True) as tape:
             discriminated_probs=self.call_episode(self.episode_num-1,adjusted_generated_x,hints)
-            D_loss=tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1-missRate)/missRate*(1-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
+            D_loss=tf.reduce_mean(mask * tf.math.log(discriminated_probs + 1e-8) + (1.-missRate)/missRate*(1.-mask) * tf.math.log(1. - discriminated_probs + 1e-8))
         D_loss_gradients = tape.gradient(D_loss,self.episodes[self.episode_num-1].trainable_variables)
         optimizer.apply_gradients(zip(D_loss_gradients,self.episodes[self.episode_num-1].trainable_variables))
     
