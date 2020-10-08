@@ -132,7 +132,7 @@ class WGAN(Orchestrator):
         lastColMask=get_test_mask(data_batch)
         lastColHints=lastColMask+(1.-lastColMask)*0.5
         
-        rangeScan=tf.reshape(tf.range(0,1,1/tf.shape(data_batch,out_type=tf.float32)[0]+1e-12,dtype=tf.float32),[tf.shape(data_batch)[0],1])
+        rangeScan=tf.reshape(tf.range(0,1,1/tf.shape(data_batch)[0]+1e-12,dtype=tf.float32),[tf.shape(data_batch)[0],1])
         zeros=tf.zeros(shape=[tf.shape(data_batch)[0],tf.shape(data_batch)[1]-1],dtype=tf.float32)    
         scanner=tf.concat([zeros,rangeScan],axis=1)
         
